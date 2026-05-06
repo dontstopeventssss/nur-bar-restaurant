@@ -1,0 +1,1121 @@
+'use client';
+
+import React, { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL as string,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
+);
+
+type Destination = 'bar' | 'kitchen';
+
+type MenuCategory = {
+  id: string;
+  name: string;
+};
+
+type MenuItem = {
+  id: string;
+  category_id: string;
+  name: string;
+  price: number;
+  destination: Destination | null;
+};
+
+type OrderRow = {
+  id: string;
+  status?: string;
+  created_at?: string;
+};
+
+type OrderItemRow = {
+  id: string;
+  order_id: string;
+  item_name: string;
+  quantity: number;
+  price: number;
+};
+
+type SalesReportRow = {
+  item_name: string;
+  total_quantity: number;
+  total_revenue: number;
+};
+
+type ReportRange = 'today' | 'week' | 'month' | 'all';
+
+const DEFAULT_OWNER_USERNAME = 'Franco';
+const DEFAULT_OWNER_PASSWORD = '0000';
+
+export default function OwnerPage() {
+  const router = useRouter();
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [ownerUsername, setOwnerUsername] = useState(DEFAULT_OWNER_USERNAME);
+  const [ownerPassword, setOwnerPassword] = useState(DEFAULT_OWNER_PASSWORD);
+
+  const [settingsUsername, setSettingsUsername] = useState(DEFAULT_OWNER_USERNAME);
+  const [settingsPassword, setSettingsPassword] = useState(DEFAULT_OWNER_PASSWORD);
+
+  const [categories, setCategories] = useState<MenuCategory[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [reportRows, setReportRows] = useState<SalesReportRow[]>([]);
+  const [reportOrderIds, setReportOrderIds] = useState<string[]>([]);
+
+  const [search, setSearch] = useState('');
+  const [reportSearch, setReportSearch] = useState('');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('all');
+  const [reportRange, setReportRange] = useState<ReportRange>('all');
+
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newProductName, setNewProductName] = useState('');
+  const [newProductPrice, setNewProductPrice] = useState('');
+  const [newProductCategoryId, setNewProductCategoryId] = useState('');
+  const [newProductDestination, setNewProductDestination] = useState<Destination>('bar');
+
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editPrice, setEditPrice] = useState('');
+  const [editCategoryId, setEditCategoryId] = useState('');
+  const [editDestination, setEditDestination] = useState<Destination>('bar');
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const savedUsername =
+      window.localStorage.getItem('nur_owner_username') || DEFAULT_OWNER_USERNAME;
+    const savedPassword =
+      window.localStorage.getItem('nur_owner_password') || DEFAULT_OWNER_PASSWORD;
+    const savedAuth = window.localStorage.getItem('nur_owner_logged_in') === 'true';
+
+    setOwnerUsername(savedUsername);
+    setOwnerPassword(savedPassword);
+    setSettingsUsername(savedUsername);
+    setSettingsPassword(savedPassword);
+    setIsAuthenticated(savedAuth);
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadData();
+    } else {
+      setLoading(false);
+    }
+  }, [isAuthenticated, reportRange]);
+
+  const isInSelectedRange = (dateString?: string) => {
+    if (!dateString) return reportRange === 'all';
+    if (reportRange === 'all') return true;
+
+    const now = new Date();
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return false;
+
+    if (reportRange === 'today') {
+      return (
+        date.getFullYear() === now.getFullYear() &&
+        date.getMonth() === now.getMonth() &&
+        date.getDate() === now.getDate()
+      );
+    }
+
+    if (reportRange === 'week') {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(now.getDate() - 7);
+      return date >= sevenDaysAgo && date <= now;
+    }
+
+    if (reportRange === 'month') {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(now.getDate() - 30);
+      return date >= thirtyDaysAgo && date <= now;
+    }
+
+    return true;
+  };
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('menu_categories')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (categoriesError) {
+        console.error('Errore caricamento categorie', categoriesError);
+        return;
+      }
+
+      const loadedCategories = (categoriesData as MenuCategory[]) ?? [];
+      setCategories(loadedCategories);
+
+      if (!newProductCategoryId && loadedCategories.length > 0) {
+        setNewProductCategoryId(loadedCategories[0].id);
+      }
+
+      const { data: itemsData, error: itemsError } = await supabase
+        .from('menu_items')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (itemsError) {
+        console.error('Errore caricamento prodotti', itemsError);
+        return;
+      }
+
+      setMenuItems((itemsData as MenuItem[]) ?? []);
+
+      const { data: ordersData, error: ordersError } = await supabase
+        .from('orders')
+        .select('*');
+
+      if (ordersError) {
+        console.error('Errore caricamento ordini per report', ordersError);
+        return;
+      }
+
+      const orders = (ordersData as OrderRow[]) ?? [];
+
+      const filteredOrders = orders.filter((order) => {
+        const statusOk = order.status === 'chiuso' || !order.status;
+        const dateOk = isInSelectedRange(order.created_at);
+        return statusOk && dateOk;
+      });
+
+      const validOrderIds = new Set(filteredOrders.map((order) => order.id));
+      setReportOrderIds(filteredOrders.map((order) => order.id));
+
+      const { data: orderItemsData, error: orderItemsError } = await supabase
+        .from('order_items')
+        .select('*');
+
+      if (orderItemsError) {
+        console.error('Errore caricamento report order_items', orderItemsError);
+      } else {
+        const rows = (orderItemsData ?? []) as OrderItemRow[];
+
+        const grouped: Record<
+          string,
+          { item_name: string; total_quantity: number; total_revenue: number }
+        > = {};
+
+        rows
+          .filter((row) => validOrderIds.has(row.order_id))
+          .forEach((row) => {
+            const key = row.item_name ?? 'Prodotto sconosciuto';
+
+            if (!grouped[key]) {
+              grouped[key] = {
+                item_name: key,
+                total_quantity: 0,
+                total_revenue: 0,
+              };
+            }
+
+            grouped[key].total_quantity += Number(row.quantity ?? 0);
+            grouped[key].total_revenue +=
+              Number(row.quantity ?? 0) * Number(row.price ?? 0);
+          });
+
+        const finalRows = Object.values(grouped).sort(
+          (a, b) => b.total_quantity - a.total_quantity
+        );
+
+        setReportRows(finalRows);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredItems = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return menuItems.filter((item) => {
+      const matchesSearch = !q || item.name.toLowerCase().includes(q);
+      const matchesCategory =
+        selectedCategoryFilter === 'all' ||
+        item.category_id === selectedCategoryFilter;
+      return matchesSearch && matchesCategory;
+    });
+  }, [menuItems, search, selectedCategoryFilter]);
+
+  const filteredReportRows = useMemo(() => {
+    const q = reportSearch.trim().toLowerCase();
+    if (!q) return reportRows;
+    return reportRows.filter((row) =>
+      row.item_name.toLowerCase().includes(q)
+    );
+  }, [reportRows, reportSearch]);
+
+  const getCategoryName = (categoryId: string) => {
+    const category = categories.find((c) => c.id === categoryId);
+    return category?.name ?? 'Senza categoria';
+  };
+
+  const handleLogin = () => {
+    if (
+      loginUsername.trim() === ownerUsername &&
+      loginPassword.trim() === ownerPassword
+    ) {
+      setIsAuthenticated(true);
+      window.localStorage.setItem('nur_owner_logged_in', 'true');
+      setLoginPassword('');
+      return;
+    }
+    alert('Credenziali non corrette.');
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    window.localStorage.setItem('nur_owner_logged_in', 'false');
+    setLoginUsername('');
+    setLoginPassword('');
+  };
+
+  const handleSaveOwnerCredentials = () => {
+    const newUser = settingsUsername.trim();
+    const newPass = settingsPassword.trim();
+
+    if (!newUser) { alert('Inserisci un nome utente valido.'); return; }
+    if (!newPass) { alert('Inserisci una password valida.'); return; }
+
+    setOwnerUsername(newUser);
+    setOwnerPassword(newPass);
+    window.localStorage.setItem('nur_owner_username', newUser);
+    window.localStorage.setItem('nur_owner_password', newPass);
+    alert('Credenziali owner aggiornate con successo.');
+  };
+
+  const handleCreateCategory = async () => {
+    const name = newCategoryName.trim();
+    if (!name) { alert('Inserisci il nome della categoria.'); return; }
+
+    setSaving(true);
+    try {
+      const { data, error } = await supabase
+        .from('menu_categories')
+        .insert({ name })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Errore creazione categoria', error);
+        alert('Errore nella creazione della categoria.');
+        return;
+      }
+
+      const created = data as MenuCategory;
+      const updated = [...categories, created].sort((a, b) =>
+        a.name.localeCompare(b.name)
+      );
+
+      setCategories(updated);
+      setNewCategoryName('');
+      setNewProductCategoryId(created.id);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteCategory = async (categoryId: string) => {
+    const linkedItems = menuItems.filter((item) => item.category_id === categoryId);
+    if (linkedItems.length > 0) {
+      alert('Non puoi eliminare una categoria che contiene prodotti.');
+      return;
+    }
+
+    if (!window.confirm('Vuoi eliminare questa categoria?')) return;
+    if (!window.confirm('Confermi di voler eliminare definitivamente questa categoria vuota?')) return;
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('menu_categories')
+        .delete()
+        .eq('id', categoryId);
+
+      if (error) {
+        console.error('Errore eliminazione categoria', error);
+        alert('Errore durante l\'eliminazione della categoria.');
+        return;
+      }
+
+      setCategories((prev) => prev.filter((c) => c.id !== categoryId));
+      if (selectedCategoryFilter === categoryId) setSelectedCategoryFilter('all');
+      if (newProductCategoryId === categoryId) setNewProductCategoryId('');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCreateProduct = async () => {
+    const name = newProductName.trim();
+    const price = Number(newProductPrice.replace(',', '.'));
+    const categoryId = newProductCategoryId;
+
+    if (!name) { alert('Inserisci il nome del prodotto.'); return; }
+    if (!categoryId) { alert('Seleziona una categoria.'); return; }
+    if (!price || price <= 0) { alert('Inserisci un prezzo valido.'); return; }
+
+    setSaving(true);
+    try {
+      const { data, error } = await supabase
+        .from('menu_items')
+        .insert({
+          name,
+          price,
+          category_id: categoryId,
+          destination: newProductDestination,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Errore creazione prodotto', error);
+        alert('Errore nella creazione del prodotto.');
+        return;
+      }
+
+      const created = data as MenuItem;
+      setMenuItems((prev) =>
+        [...prev, created].sort((a, b) => a.name.localeCompare(b.name))
+      );
+
+      setNewProductName('');
+      setNewProductPrice('');
+      setNewProductDestination('bar');
+      await loadData();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const startEditItem = (item: MenuItem) => {
+    setEditingItemId(item.id);
+    setEditName(item.name);
+    setEditPrice(String(item.price));
+    setEditCategoryId(item.category_id);
+    setEditDestination(item.destination ?? 'bar');
+  };
+
+  const cancelEditItem = () => {
+    setEditingItemId(null);
+    setEditName('');
+    setEditPrice('');
+    setEditCategoryId('');
+    setEditDestination('bar');
+  };
+
+  const handleSaveItem = async () => {
+    if (!editingItemId) return;
+
+    const name = editName.trim();
+    const price = Number(editPrice.replace(',', '.'));
+    const categoryId = editCategoryId;
+
+    if (!name) { alert('Inserisci il nome del prodotto.'); return; }
+    if (!categoryId) { alert('Seleziona una categoria.'); return; }
+    if (!price || price <= 0) { alert('Inserisci un prezzo valido.'); return; }
+
+    setSaving(true);
+    try {
+      const { data, error } = await supabase
+        .from('menu_items')
+        .update({
+          name,
+          price,
+          category_id: categoryId,
+          destination: editDestination,
+        })
+        .eq('id', editingItemId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Errore modifica prodotto', error);
+        alert('Errore durante il salvataggio del prodotto.');
+        return;
+      }
+
+      const updated = data as MenuItem;
+      setMenuItems((prev) =>
+        prev
+          .map((item) => (item.id === editingItemId ? updated : item))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      );
+
+      cancelEditItem();
+      await loadData();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteItem = async (itemId: string, itemName: string) => {
+    if (!window.confirm(`Vuoi eliminare il prodotto "${itemName}" dal menu?`)) return;
+    if (!window.confirm(`Conferma definitiva: eliminare davvero "${itemName}"? Questa azione non si può annullare.`)) return;
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('menu_items')
+        .delete()
+        .eq('id', itemId);
+
+      if (error) {
+        console.error('Errore eliminazione prodotto', error);
+        alert('Errore durante l\'eliminazione del prodotto.');
+        return;
+      }
+
+      setMenuItems((prev) => prev.filter((item) => item.id !== itemId));
+      if (editingItemId === itemId) cancelEditItem();
+      await loadData();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteHistoricalReportData = async () => {
+    if (reportOrderIds.length === 0) {
+      alert('Non ci sono dati storici da eliminare nel periodo selezionato.');
+      return;
+    }
+
+    if (!window.confirm('ATTENZIONE: stai per eliminare i dati storici del report per il periodo selezionato. Vuoi continuare?')) return;
+    if (!window.confirm('Seconda conferma: verranno eliminati ordini e righe ordine collegate al report. Sei sicuro?')) return;
+
+    const typed = window.prompt('Terza conferma obbligatoria: scrivi ELIMINA per procedere definitivamente.');
+    if (typed !== 'ELIMINA') {
+      alert('Conferma finale non valida. Nessun dato eliminato.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const { error: orderItemsDeleteError } = await supabase
+        .from('order_items')
+        .delete()
+        .in('order_id', reportOrderIds);
+
+      if (orderItemsDeleteError) {
+        console.error('Errore eliminazione order_items storico', orderItemsDeleteError);
+        alert('Errore durante l\'eliminazione delle righe storiche del report.');
+        return;
+      }
+
+      const { error: ordersDeleteError } = await supabase
+        .from('orders')
+        .delete()
+        .in('id', reportOrderIds);
+
+      if (ordersDeleteError) {
+        console.error('Errore eliminazione orders storico', ordersDeleteError);
+        alert('Errore durante l\'eliminazione degli ordini storici.');
+        return;
+      }
+
+      alert('Storico report eliminato con successo.');
+      await loadData();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ── Toggle destinazione riutilizzabile ──────────────────────────────────
+  const DestinationToggle = ({
+    value,
+    onChange,
+  }: {
+    value: Destination;
+    onChange: (v: Destination) => void;
+  }) => (
+    <div style={{ display: 'flex', gap: 6 }}>
+      <button
+        type="button"
+        onClick={() => onChange('bar')}
+        style={{
+          flex: 1,
+          padding: '7px 8px',
+          borderRadius: 6,
+          border: `2px solid ${value === 'bar' ? '#1e40af' : '#ccc'}`,
+          backgroundColor: value === 'bar' ? '#dbeafe' : '#fff',
+          color: value === 'bar' ? '#1e40af' : '#666',
+          fontWeight: 700,
+          fontSize: 12,
+          cursor: 'pointer',
+        }}
+      >
+        🍹 BAR
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange('kitchen')}
+        style={{
+          flex: 1,
+          padding: '7px 8px',
+          borderRadius: 6,
+          border: `2px solid ${value === 'kitchen' ? '#92400e' : '#ccc'}`,
+          backgroundColor: value === 'kitchen' ? '#fef3c7' : '#fff',
+          color: value === 'kitchen' ? '#92400e' : '#666',
+          fontWeight: 700,
+          fontSize: 12,
+          cursor: 'pointer',
+        }}
+      >
+        🍽 CUCINA
+      </button>
+    </div>
+  );
+
+  if (!isAuthenticated) {
+    return (
+      <main style={styles.loginPage}>
+        <div style={styles.loginCard}>
+          <h1 style={styles.title}>Accesso Owner</h1>
+          <p style={styles.subtitle}>
+            Inserisci credenziali per entrare nell'area amministrazione
+          </p>
+
+          <div style={styles.formGrid}>
+            <div>
+              <label style={styles.label}>Nome utente</label>
+              <input
+                type="text"
+                value={loginUsername}
+                onChange={(e) => setLoginUsername(e.target.value)}
+                placeholder="Franco"
+                style={styles.input}
+              />
+            </div>
+            <div>
+              <label style={styles.label}>Password</label>
+              <input
+                type="password"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                placeholder="0000"
+                style={styles.input}
+              />
+            </div>
+          </div>
+
+          <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+            <button type="button" onClick={handleLogin} style={styles.primaryButton}>
+              Entra
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push('/')}
+              style={styles.secondaryButton}
+            >
+              Torna home
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main style={styles.page}>
+      <div style={styles.topBar}>
+        <div>
+          <h1 style={styles.title}>Dashboard Owner</h1>
+          <p style={styles.subtitle}>
+            Gestione menu, credenziali e report prodotti più consumati
+          </p>
+        </div>
+
+        <div style={styles.actionsRow}>
+          <button
+            type="button"
+            onClick={() => router.push('/')}
+            style={styles.secondaryButton}
+          >
+            ← Torna home
+          </button>
+          <button
+            type="button"
+            onClick={handleLogout}
+            style={styles.secondaryButton}
+          >
+            Logout
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={styles.card}>Caricamento dati…</div>
+      ) : (
+        <div style={styles.layout}>
+          <section style={styles.leftColumn}>
+
+            {/* Credenziali */}
+            <div style={styles.card}>
+              <h2 style={styles.sectionTitle}>Credenziali Owner</h2>
+              <div style={styles.formGrid}>
+                <div>
+                  <label style={styles.label}>Nome utente</label>
+                  <input
+                    type="text"
+                    value={settingsUsername}
+                    onChange={(e) => setSettingsUsername(e.target.value)}
+                    style={styles.input}
+                  />
+                </div>
+                <div>
+                  <label style={styles.label}>Password</label>
+                  <input
+                    type="password"
+                    value={settingsPassword}
+                    onChange={(e) => setSettingsPassword(e.target.value)}
+                    style={styles.input}
+                  />
+                </div>
+              </div>
+              <div style={{ marginTop: 12 }}>
+                <button
+                  type="button"
+                  onClick={handleSaveOwnerCredentials}
+                  style={styles.primaryButton}
+                >
+                  Salva credenziali
+                </button>
+              </div>
+            </div>
+
+            {/* Categorie */}
+            <div style={styles.card}>
+              <h2 style={styles.sectionTitle}>Categorie</h2>
+              <div style={styles.formRow}>
+                <input
+                  type="text"
+                  placeholder="Nuova categoria"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  style={styles.input}
+                />
+                <button
+                  type="button"
+                  onClick={handleCreateCategory}
+                  style={styles.primaryButton}
+                >
+                  Aggiungi
+                </button>
+              </div>
+
+              <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategoryFilter('all')}
+                  style={{
+                    ...styles.categoryFilterButton,
+                    backgroundColor: selectedCategoryFilter === 'all' ? '#111' : '#fff',
+                    color: selectedCategoryFilter === 'all' ? '#fff' : '#111',
+                  }}
+                >
+                  Tutte le categorie
+                </button>
+
+                {categories.map((category) => {
+                  const count = menuItems.filter(
+                    (item) => item.category_id === category.id
+                  ).length;
+
+                  return (
+                    <div key={category.id} style={styles.categoryRow}>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCategoryFilter(category.id)}
+                        style={{
+                          ...styles.categoryFilterButton,
+                          flex: 1,
+                          backgroundColor:
+                            selectedCategoryFilter === category.id ? '#111' : '#fff',
+                          color:
+                            selectedCategoryFilter === category.id ? '#fff' : '#111',
+                        }}
+                      >
+                        {category.name} ({count})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCategory(category.id)}
+                        style={styles.redButton}
+                        title="Elimina categoria"
+                      >
+                        Elimina
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Nuovo prodotto */}
+            <div style={styles.card}>
+              <h2 style={styles.sectionTitle}>Nuovo prodotto</h2>
+
+              <div style={styles.formGrid}>
+                <div>
+                  <label style={styles.label}>Nome prodotto</label>
+                  <input
+                    type="text"
+                    placeholder="Es. Americano"
+                    value={newProductName}
+                    onChange={(e) => setNewProductName(e.target.value)}
+                    style={styles.input}
+                  />
+                </div>
+
+                <div>
+                  <label style={styles.label}>Prezzo</label>
+                  <input
+                    type="text"
+                    placeholder="Es. 7.50"
+                    value={newProductPrice}
+                    onChange={(e) => setNewProductPrice(e.target.value)}
+                    style={styles.input}
+                  />
+                </div>
+
+                <div>
+                  <label style={styles.label}>Categoria</label>
+                  <select
+                    value={newProductCategoryId}
+                    onChange={(e) => setNewProductCategoryId(e.target.value)}
+                    style={styles.input}
+                  >
+                    <option value="">Seleziona categoria</option>
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* ← TOGGLE DESTINAZIONE */}
+                <div>
+                  <label style={styles.label}>Destinazione ordine</label>
+                  <DestinationToggle
+                    value={newProductDestination}
+                    onChange={setNewProductDestination}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginTop: 12 }}>
+                <button
+                  type="button"
+                  onClick={handleCreateProduct}
+                  style={styles.primaryButton}
+                >
+                  Salva prodotto
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section style={styles.rightColumn}>
+
+            {/* Tabella prodotti */}
+            <div style={styles.card}>
+              <div style={styles.productsHeader}>
+                <div>
+                  <h2 style={styles.sectionTitle}>Prodotti menu</h2>
+                  <p style={styles.smallText}>
+                    Modifica rapida di nome, prezzo, categoria e destinazione
+                  </p>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Cerca prodotto..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  style={{ ...styles.input, minWidth: 240 }}
+                />
+              </div>
+
+              {saving && (
+                <div style={{ ...styles.smallText, marginBottom: 10 }}>
+                  Salvataggio in corso…
+                </div>
+              )}
+
+              <div style={styles.tableWrap}>
+                <table style={styles.table}>
+                  <thead>
+                    <tr>
+                      <th style={styles.th}>Nome</th>
+                      <th style={styles.th}>Categoria</th>
+                      <th style={styles.th}>Prezzo</th>
+                      <th style={styles.th}>Dest.</th>
+                      <th style={styles.th}>Azioni</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredItems.length === 0 ? (
+                      <tr>
+                        <td style={styles.emptyTd} colSpan={5}>
+                          Nessun prodotto trovato.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredItems.map((item) => {
+                        const isEditing = editingItemId === item.id;
+
+                        return (
+                          <tr key={item.id}>
+                            <td style={styles.td}>
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  value={editName}
+                                  onChange={(e) => setEditName(e.target.value)}
+                                  style={styles.input}
+                                />
+                              ) : (
+                                item.name
+                              )}
+                            </td>
+
+                            <td style={styles.td}>
+                              {isEditing ? (
+                                <select
+                                  value={editCategoryId}
+                                  onChange={(e) => setEditCategoryId(e.target.value)}
+                                  style={styles.input}
+                                >
+                                  <option value="">Seleziona categoria</option>
+                                  {categories.map((category) => (
+                                    <option key={category.id} value={category.id}>
+                                      {category.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                getCategoryName(item.category_id)
+                              )}
+                            </td>
+
+                            <td style={styles.td}>
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  value={editPrice}
+                                  onChange={(e) => setEditPrice(e.target.value)}
+                                  style={styles.input}
+                                />
+                              ) : (
+                                `€ ${Number(item.price).toFixed(2)}`
+                              )}
+                            </td>
+
+                            {/* ← COLONNA DESTINAZIONE */}
+                            <td style={styles.td}>
+                              {isEditing ? (
+                                <DestinationToggle
+                                  value={editDestination}
+                                  onChange={setEditDestination}
+                                />
+                              ) : (
+                                <span
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    padding: '2px 6px',
+                                    borderRadius: 4,
+                                    backgroundColor:
+                                      item.destination === 'kitchen'
+                                        ? '#fef3c7'
+                                        : '#dbeafe',
+                                    color:
+                                      item.destination === 'kitchen'
+                                        ? '#92400e'
+                                        : '#1e40af',
+                                  }}
+                                >
+                                  {item.destination === 'kitchen'
+                                    ? '🍽 CUCINA'
+                                    : '🍹 BAR'}
+                                </span>
+                              )}
+                            </td>
+
+                            <td style={styles.td}>
+                              <div style={styles.actionsRow}>
+                                {isEditing ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={handleSaveItem}
+                                      style={styles.primaryButtonSmall}
+                                    >
+                                      Salva
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={cancelEditItem}
+                                      style={styles.secondaryButtonSmall}
+                                    >
+                                      Annulla
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => startEditItem(item)}
+                                      style={styles.secondaryButtonSmall}
+                                    >
+                                      Modifica
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleDeleteItem(item.id, item.name)
+                                      }
+                                      style={styles.redButton}
+                                    >
+                                      Elimina
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Report */}
+            <div style={styles.card}>
+              <div style={styles.productsHeader}>
+                <div>
+                  <h2 style={styles.sectionTitle}>Report prodotti più venduti</h2>
+                  <p style={styles.smallText}>
+                    Classifica dei consumi maggiori nel locale per singolo prodotto
+                  </p>
+                </div>
+                <div style={styles.reportControls}>
+                  <select
+                    value={reportRange}
+                    onChange={(e) => setReportRange(e.target.value as ReportRange)}
+                    style={{ ...styles.input, minWidth: 150 }}
+                  >
+                    <option value="today">Oggi</option>
+                    <option value="week">Ultimi 7 giorni</option>
+                    <option value="month">Ultimi 30 giorni</option>
+                    <option value="all">Tutto</option>
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="Cerca nel report..."
+                    value={reportSearch}
+                    onChange={(e) => setReportSearch(e.target.value)}
+                    style={{ ...styles.input, minWidth: 220 }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 14 }}>
+                <button
+                  type="button"
+                  onClick={handleDeleteHistoricalReportData}
+                  style={styles.bigDangerButton}
+                >
+                  ELIMINA DATI STORICI REPORT
+                </button>
+                <p style={{ ...styles.smallText, marginTop: 8, color: '#991b1b' }}>
+                  Azione distruttiva: elimina ordini e righe ordine del periodo selezionato.
+                </p>
+              </div>
+
+              <div style={styles.tableWrap}>
+                <table style={styles.table}>
+                  <thead>
+                    <tr>
+                      <th style={styles.th}>#</th>
+                      <th style={styles.th}>Prodotto</th>
+                      <th style={styles.th}>Quantità venduta</th>
+                      <th style={styles.th}>Incasso totale</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredReportRows.length === 0 ? (
+                      <tr>
+                        <td style={styles.emptyTd} colSpan={4}>
+                          Nessun dato disponibile per il periodo selezionato.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredReportRows.map((row, index) => (
+                        <tr key={`${row.item_name}-${index}`}>
+                          <td style={styles.td}>{index + 1}</td>
+                          <td style={styles.td}>{row.item_name}</td>
+                          <td style={styles.td}>{row.total_quantity}</td>
+                          <td style={styles.td}>
+                            € {row.total_revenue.toFixed(2)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+    </main>
+  );
+}
+
+const styles: Record<string, React.CSSProperties> = {
+  page: { padding: 16, backgroundColor: '#f5f5f5', minHeight: '100vh', color: '#111' },
+  loginPage: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f5f5f5', padding: 16 },
+  loginCard: { width: '100%', maxWidth: 420, backgroundColor: '#fff', border: '1px solid #ddd', borderRadius: 12, padding: 20 },
+  topBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 16, flexWrap: 'wrap' },
+  title: { fontSize: 28, margin: 0, color: '#111' },
+  subtitle: { margin: '4px 0 0 0', color: '#555', fontSize: 14 },
+  layout: { display: 'grid', gridTemplateColumns: '320px 1fr', gap: 16 },
+  leftColumn: { display: 'flex', flexDirection: 'column', gap: 16 },
+  rightColumn: { display: 'flex', flexDirection: 'column', gap: 16 },
+  card: { backgroundColor: '#fff', border: '1px solid #ddd', borderRadius: 10, padding: 16 },
+  sectionTitle: { fontSize: 18, margin: '0 0 12px 0', color: '#111' },
+  formRow: { display: 'flex', gap: 8 },
+  formGrid: { display: 'grid', gap: 10 },
+  input: { width: '100%', padding: '9px 10px', borderRadius: 6, border: '1px solid #ccc', fontSize: 14, backgroundColor: '#fff', color: '#111' },
+  label: { display: 'block', marginBottom: 4, fontSize: 12, color: '#444' },
+  primaryButton: { padding: '9px 12px', borderRadius: 6, border: 'none', backgroundColor: '#111', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 },
+  secondaryButton: { padding: '9px 12px', borderRadius: 6, border: '1px solid #ccc', backgroundColor: '#fff', color: '#111', cursor: 'pointer', fontSize: 14 },
+  primaryButtonSmall: { padding: '7px 10px', borderRadius: 6, border: 'none', backgroundColor: '#111', color: '#fff', cursor: 'pointer', fontSize: 13 },
+  secondaryButtonSmall: { padding: '7px 10px', borderRadius: 6, border: '1px solid #ccc', backgroundColor: '#fff', color: '#111', cursor: 'pointer', fontSize: 13 },
+  redButton: { padding: '7px 10px', borderRadius: 6, border: '1px solid #b91c1c', backgroundColor: '#dc2626', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600 },
+  bigDangerButton: { padding: '12px 18px', borderRadius: 8, border: '2px solid #991b1b', backgroundColor: '#dc2626', color: '#fff', cursor: 'pointer', fontSize: 15, fontWeight: 700, letterSpacing: 0.4 },
+  categoryRow: { display: 'flex', gap: 8, alignItems: 'center' },
+  categoryFilterButton: { padding: '9px 10px', borderRadius: 6, border: '1px solid #ccc', cursor: 'pointer', textAlign: 'left', fontSize: 14 },
+  productsHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 12 },
+  reportControls: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
+  smallText: { fontSize: 12, color: '#666', margin: 0 },
+  tableWrap: { overflowX: 'auto' },
+  table: { width: '100%', borderCollapse: 'collapse' },
+  th: { textAlign: 'left', fontSize: 12, color: '#666', borderBottom: '1px solid #ddd', padding: '10px 8px', whiteSpace: 'nowrap' },
+  td: { padding: '10px 8px', borderBottom: '1px solid #eee', verticalAlign: 'middle', fontSize: 14, color: '#111' },
+  emptyTd: { padding: '20px 8px', textAlign: 'center', color: '#777', fontSize: 14 },
+  actionsRow: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
+};
