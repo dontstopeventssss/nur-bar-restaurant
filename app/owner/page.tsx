@@ -54,6 +54,7 @@ export default function OwnerPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loginUsername, setLoginUsername] = useState('');
@@ -100,6 +101,14 @@ export default function OwnerPage() {
     setSettingsUsername(savedUsername);
     setSettingsPassword(savedPassword);
     setIsAuthenticated(savedAuth);
+
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   useEffect(() => {
@@ -284,8 +293,14 @@ export default function OwnerPage() {
     const newUser = settingsUsername.trim();
     const newPass = settingsPassword.trim();
 
-    if (!newUser) { alert('Inserisci un nome utente valido.'); return; }
-    if (!newPass) { alert('Inserisci una password valida.'); return; }
+    if (!newUser) {
+      alert('Inserisci un nome utente valido.');
+      return;
+    }
+    if (!newPass) {
+      alert('Inserisci una password valida.');
+      return;
+    }
 
     setOwnerUsername(newUser);
     setOwnerPassword(newPass);
@@ -296,7 +311,10 @@ export default function OwnerPage() {
 
   const handleCreateCategory = async () => {
     const name = newCategoryName.trim();
-    if (!name) { alert('Inserisci il nome della categoria.'); return; }
+    if (!name) {
+      alert('Inserisci il nome della categoria.');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -333,7 +351,12 @@ export default function OwnerPage() {
     }
 
     if (!window.confirm('Vuoi eliminare questa categoria?')) return;
-    if (!window.confirm('Confermi di voler eliminare definitivamente questa categoria vuota?')) return;
+    if (
+      !window.confirm(
+        'Confermi di voler eliminare definitivamente questa categoria vuota?'
+      )
+    )
+      return;
 
     setSaving(true);
     try {
@@ -344,7 +367,7 @@ export default function OwnerPage() {
 
       if (error) {
         console.error('Errore eliminazione categoria', error);
-        alert('Errore durante l\'eliminazione della categoria.');
+        alert("Errore durante l'eliminazione della categoria.");
         return;
       }
 
@@ -361,9 +384,18 @@ export default function OwnerPage() {
     const price = Number(newProductPrice.replace(',', '.'));
     const categoryId = newProductCategoryId;
 
-    if (!name) { alert('Inserisci il nome del prodotto.'); return; }
-    if (!categoryId) { alert('Seleziona una categoria.'); return; }
-    if (!price || price <= 0) { alert('Inserisci un prezzo valido.'); return; }
+    if (!name) {
+      alert('Inserisci il nome del prodotto.');
+      return;
+    }
+    if (!categoryId) {
+      alert('Seleziona una categoria.');
+      return;
+    }
+    if (!price || price <= 0) {
+      alert('Inserisci un prezzo valido.');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -421,9 +453,18 @@ export default function OwnerPage() {
     const price = Number(editPrice.replace(',', '.'));
     const categoryId = editCategoryId;
 
-    if (!name) { alert('Inserisci il nome del prodotto.'); return; }
-    if (!categoryId) { alert('Seleziona una categoria.'); return; }
-    if (!price || price <= 0) { alert('Inserisci un prezzo valido.'); return; }
+    if (!name) {
+      alert('Inserisci il nome del prodotto.');
+      return;
+    }
+    if (!categoryId) {
+      alert('Seleziona una categoria.');
+      return;
+    }
+    if (!price || price <= 0) {
+      alert('Inserisci un prezzo valido.');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -461,7 +502,12 @@ export default function OwnerPage() {
 
   const handleDeleteItem = async (itemId: string, itemName: string) => {
     if (!window.confirm(`Vuoi eliminare il prodotto "${itemName}" dal menu?`)) return;
-    if (!window.confirm(`Conferma definitiva: eliminare davvero "${itemName}"? Questa azione non si può annullare.`)) return;
+    if (
+      !window.confirm(
+        `Conferma definitiva: eliminare davvero "${itemName}"? Questa azione non si può annullare.`
+      )
+    )
+      return;
 
     setSaving(true);
     try {
@@ -472,7 +518,7 @@ export default function OwnerPage() {
 
       if (error) {
         console.error('Errore eliminazione prodotto', error);
-        alert('Errore durante l\'eliminazione del prodotto.');
+        alert("Errore durante l'eliminazione del prodotto.");
         return;
       }
 
@@ -490,10 +536,22 @@ export default function OwnerPage() {
       return;
     }
 
-    if (!window.confirm('ATTENZIONE: stai per eliminare i dati storici del report per il periodo selezionato. Vuoi continuare?')) return;
-    if (!window.confirm('Seconda conferma: verranno eliminati ordini e righe ordine collegate al report. Sei sicuro?')) return;
+    if (
+      !window.confirm(
+        'ATTENZIONE: stai per eliminare i dati storici del report per il periodo selezionato. Vuoi continuare?'
+      )
+    )
+      return;
+    if (
+      !window.confirm(
+        'Seconda conferma: verranno eliminati ordini e righe ordine collegate al report. Sei sicuro?'
+      )
+    )
+      return;
 
-    const typed = window.prompt('Terza conferma obbligatoria: scrivi ELIMINA per procedere definitivamente.');
+    const typed = window.prompt(
+      'Terza conferma obbligatoria: scrivi ELIMINA per procedere definitivamente.'
+    );
     if (typed !== 'ELIMINA') {
       alert('Conferma finale non valida. Nessun dato eliminato.');
       return;
@@ -507,8 +565,11 @@ export default function OwnerPage() {
         .in('order_id', reportOrderIds);
 
       if (orderItemsDeleteError) {
-        console.error('Errore eliminazione order_items storico', orderItemsDeleteError);
-        alert('Errore durante l\'eliminazione delle righe storiche del report.');
+        console.error(
+          'Errore eliminazione order_items storico',
+          orderItemsDeleteError
+        );
+        alert("Errore durante l'eliminazione delle righe storiche del report.");
         return;
       }
 
@@ -519,7 +580,7 @@ export default function OwnerPage() {
 
       if (ordersDeleteError) {
         console.error('Errore eliminazione orders storico', ordersDeleteError);
-        alert('Errore durante l\'eliminazione degli ordini storici.');
+        alert("Errore durante l'eliminazione degli ordini storici.");
         return;
       }
 
@@ -530,7 +591,6 @@ export default function OwnerPage() {
     }
   };
 
-  // ── Toggle destinazione riutilizzabile ──────────────────────────────────
   const DestinationToggle = ({
     value,
     onChange,
@@ -538,20 +598,28 @@ export default function OwnerPage() {
     value: Destination;
     onChange: (v: Destination) => void;
   }) => (
-    <div style={{ display: 'flex', gap: 6 }}>
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr',
+        gap: 6,
+        width: '100%',
+      }}
+    >
       <button
         type="button"
         onClick={() => onChange('bar')}
         style={{
           flex: 1,
-          padding: '7px 8px',
-          borderRadius: 6,
+          padding: isMobile ? '10px 8px' : '7px 8px',
+          borderRadius: 8,
           border: `2px solid ${value === 'bar' ? '#1e40af' : '#ccc'}`,
           backgroundColor: value === 'bar' ? '#dbeafe' : '#fff',
           color: value === 'bar' ? '#1e40af' : '#666',
           fontWeight: 700,
           fontSize: 12,
           cursor: 'pointer',
+          minHeight: 42,
         }}
       >
         🍹 BAR
@@ -561,14 +629,15 @@ export default function OwnerPage() {
         onClick={() => onChange('kitchen')}
         style={{
           flex: 1,
-          padding: '7px 8px',
-          borderRadius: 6,
+          padding: isMobile ? '10px 8px' : '7px 8px',
+          borderRadius: 8,
           border: `2px solid ${value === 'kitchen' ? '#92400e' : '#ccc'}`,
           backgroundColor: value === 'kitchen' ? '#fef3c7' : '#fff',
           color: value === 'kitchen' ? '#92400e' : '#666',
           fontWeight: 700,
           fontSize: 12,
           cursor: 'pointer',
+          minHeight: 42,
         }}
       >
         🍽 CUCINA
@@ -608,14 +677,14 @@ export default function OwnerPage() {
             </div>
           </div>
 
-          <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-            <button type="button" onClick={handleLogin} style={styles.primaryButton}>
+          <div style={isMobile ? styles.stackButtons : styles.inlineButtons}>
+            <button type="button" onClick={handleLogin} style={styles.primaryButtonWide}>
               Entra
             </button>
             <button
               type="button"
               onClick={() => router.push('/')}
-              style={styles.secondaryButton}
+              style={styles.secondaryButtonWide}
             >
               Torna home
             </button>
@@ -628,25 +697,25 @@ export default function OwnerPage() {
   return (
     <main style={styles.page}>
       <div style={styles.topBar}>
-        <div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <h1 style={styles.title}>Dashboard Owner</h1>
           <p style={styles.subtitle}>
             Gestione menu, credenziali e report prodotti più consumati
           </p>
         </div>
 
-        <div style={styles.actionsRow}>
+        <div style={isMobile ? styles.stackButtons : styles.actionsRow}>
           <button
             type="button"
             onClick={() => router.push('/')}
-            style={styles.secondaryButton}
+            style={isMobile ? styles.secondaryButtonWide : styles.secondaryButton}
           >
             ← Torna home
           </button>
           <button
             type="button"
             onClick={handleLogout}
-            style={styles.secondaryButton}
+            style={isMobile ? styles.secondaryButtonWide : styles.secondaryButton}
           >
             Logout
           </button>
@@ -656,10 +725,13 @@ export default function OwnerPage() {
       {loading ? (
         <div style={styles.card}>Caricamento dati…</div>
       ) : (
-        <div style={styles.layout}>
+        <div
+          style={{
+            ...styles.layout,
+            gridTemplateColumns: isMobile ? '1fr' : '320px 1fr',
+          }}
+        >
           <section style={styles.leftColumn}>
-
-            {/* Credenziali */}
             <div style={styles.card}>
               <h2 style={styles.sectionTitle}>Credenziali Owner</h2>
               <div style={styles.formGrid}>
@@ -686,17 +758,16 @@ export default function OwnerPage() {
                 <button
                   type="button"
                   onClick={handleSaveOwnerCredentials}
-                  style={styles.primaryButton}
+                  style={isMobile ? styles.primaryButtonWide : styles.primaryButton}
                 >
                   Salva credenziali
                 </button>
               </div>
             </div>
 
-            {/* Categorie */}
             <div style={styles.card}>
               <h2 style={styles.sectionTitle}>Categorie</h2>
-              <div style={styles.formRow}>
+              <div style={isMobile ? styles.formColumn : styles.formRow}>
                 <input
                   type="text"
                   placeholder="Nuova categoria"
@@ -707,7 +778,7 @@ export default function OwnerPage() {
                 <button
                   type="button"
                   onClick={handleCreateCategory}
-                  style={styles.primaryButton}
+                  style={isMobile ? styles.primaryButtonWide : styles.primaryButton}
                 >
                   Aggiungi
                 </button>
@@ -732,13 +803,17 @@ export default function OwnerPage() {
                   ).length;
 
                   return (
-                    <div key={category.id} style={styles.categoryRow}>
+                    <div
+                      key={category.id}
+                      style={isMobile ? styles.categoryRowMobile : styles.categoryRow}
+                    >
                       <button
                         type="button"
                         onClick={() => setSelectedCategoryFilter(category.id)}
                         style={{
                           ...styles.categoryFilterButton,
                           flex: 1,
+                          width: '100%',
                           backgroundColor:
                             selectedCategoryFilter === category.id ? '#111' : '#fff',
                           color:
@@ -750,7 +825,7 @@ export default function OwnerPage() {
                       <button
                         type="button"
                         onClick={() => handleDeleteCategory(category.id)}
-                        style={styles.redButton}
+                        style={isMobile ? styles.redButtonWide : styles.redButton}
                         title="Elimina categoria"
                       >
                         Elimina
@@ -761,7 +836,6 @@ export default function OwnerPage() {
               </div>
             </div>
 
-            {/* Nuovo prodotto */}
             <div style={styles.card}>
               <h2 style={styles.sectionTitle}>Nuovo prodotto</h2>
 
@@ -804,7 +878,6 @@ export default function OwnerPage() {
                   </select>
                 </div>
 
-                {/* ← TOGGLE DESTINAZIONE */}
                 <div>
                   <label style={styles.label}>Destinazione ordine</label>
                   <DestinationToggle
@@ -818,7 +891,7 @@ export default function OwnerPage() {
                 <button
                   type="button"
                   onClick={handleCreateProduct}
-                  style={styles.primaryButton}
+                  style={isMobile ? styles.primaryButtonWide : styles.primaryButton}
                 >
                   Salva prodotto
                 </button>
@@ -827,11 +900,9 @@ export default function OwnerPage() {
           </section>
 
           <section style={styles.rightColumn}>
-
-            {/* Tabella prodotti */}
             <div style={styles.card}>
-              <div style={styles.productsHeader}>
-                <div>
+              <div style={isMobile ? styles.productsHeaderMobile : styles.productsHeader}>
+                <div style={{ minWidth: 0 }}>
                   <h2 style={styles.sectionTitle}>Prodotti menu</h2>
                   <p style={styles.smallText}>
                     Modifica rapida di nome, prezzo, categoria e destinazione
@@ -842,7 +913,11 @@ export default function OwnerPage() {
                   placeholder="Cerca prodotto..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  style={{ ...styles.input, minWidth: 240 }}
+                  style={{
+                    ...styles.input,
+                    minWidth: isMobile ? 0 : 240,
+                    width: isMobile ? '100%' : undefined,
+                  }}
                 />
               </div>
 
@@ -921,7 +996,6 @@ export default function OwnerPage() {
                               )}
                             </td>
 
-                            {/* ← COLONNA DESTINAZIONE */}
                             <td style={styles.td}>
                               {isEditing ? (
                                 <DestinationToggle
@@ -933,8 +1007,8 @@ export default function OwnerPage() {
                                   style={{
                                     fontSize: 11,
                                     fontWeight: 700,
-                                    padding: '2px 6px',
-                                    borderRadius: 4,
+                                    padding: '4px 8px',
+                                    borderRadius: 999,
                                     backgroundColor:
                                       item.destination === 'kitchen'
                                         ? '#fef3c7'
@@ -943,6 +1017,8 @@ export default function OwnerPage() {
                                       item.destination === 'kitchen'
                                         ? '#92400e'
                                         : '#1e40af',
+                                    whiteSpace: 'nowrap',
+                                    display: 'inline-block',
                                   }}
                                 >
                                   {item.destination === 'kitchen'
@@ -953,20 +1029,20 @@ export default function OwnerPage() {
                             </td>
 
                             <td style={styles.td}>
-                              <div style={styles.actionsRow}>
+                              <div style={isMobile ? styles.actionsColumn : styles.actionsRow}>
                                 {isEditing ? (
                                   <>
                                     <button
                                       type="button"
                                       onClick={handleSaveItem}
-                                      style={styles.primaryButtonSmall}
+                                      style={isMobile ? styles.primaryButtonWideSmall : styles.primaryButtonSmall}
                                     >
                                       Salva
                                     </button>
                                     <button
                                       type="button"
                                       onClick={cancelEditItem}
-                                      style={styles.secondaryButtonSmall}
+                                      style={isMobile ? styles.secondaryButtonWideSmall : styles.secondaryButtonSmall}
                                     >
                                       Annulla
                                     </button>
@@ -976,16 +1052,14 @@ export default function OwnerPage() {
                                     <button
                                       type="button"
                                       onClick={() => startEditItem(item)}
-                                      style={styles.secondaryButtonSmall}
+                                      style={isMobile ? styles.secondaryButtonWideSmall : styles.secondaryButtonSmall}
                                     >
                                       Modifica
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() =>
-                                        handleDeleteItem(item.id, item.name)
-                                      }
-                                      style={styles.redButton}
+                                      onClick={() => handleDeleteItem(item.id, item.name)}
+                                      style={isMobile ? styles.redButtonWideSmall : styles.redButton}
                                     >
                                       Elimina
                                     </button>
@@ -1002,20 +1076,24 @@ export default function OwnerPage() {
               </div>
             </div>
 
-            {/* Report */}
             <div style={styles.card}>
-              <div style={styles.productsHeader}>
-                <div>
+              <div style={isMobile ? styles.productsHeaderMobile : styles.productsHeader}>
+                <div style={{ minWidth: 0 }}>
                   <h2 style={styles.sectionTitle}>Report prodotti più venduti</h2>
                   <p style={styles.smallText}>
                     Classifica dei consumi maggiori nel locale per singolo prodotto
                   </p>
                 </div>
-                <div style={styles.reportControls}>
+
+                <div style={isMobile ? styles.reportControlsMobile : styles.reportControls}>
                   <select
                     value={reportRange}
                     onChange={(e) => setReportRange(e.target.value as ReportRange)}
-                    style={{ ...styles.input, minWidth: 150 }}
+                    style={{
+                      ...styles.input,
+                      minWidth: isMobile ? 0 : 150,
+                      width: isMobile ? '100%' : undefined,
+                    }}
                   >
                     <option value="today">Oggi</option>
                     <option value="week">Ultimi 7 giorni</option>
@@ -1027,7 +1105,11 @@ export default function OwnerPage() {
                     placeholder="Cerca nel report..."
                     value={reportSearch}
                     onChange={(e) => setReportSearch(e.target.value)}
-                    style={{ ...styles.input, minWidth: 220 }}
+                    style={{
+                      ...styles.input,
+                      minWidth: isMobile ? 0 : 220,
+                      width: isMobile ? '100%' : undefined,
+                    }}
                   />
                 </div>
               </div>
@@ -1036,7 +1118,7 @@ export default function OwnerPage() {
                 <button
                   type="button"
                   onClick={handleDeleteHistoricalReportData}
-                  style={styles.bigDangerButton}
+                  style={isMobile ? styles.bigDangerButtonWide : styles.bigDangerButton}
                 >
                   ELIMINA DATI STORICI REPORT
                 </button>
@@ -1068,9 +1150,7 @@ export default function OwnerPage() {
                           <td style={styles.td}>{index + 1}</td>
                           <td style={styles.td}>{row.item_name}</td>
                           <td style={styles.td}>{row.total_quantity}</td>
-                          <td style={styles.td}>
-                            € {row.total_revenue.toFixed(2)}
-                          </td>
+                          <td style={styles.td}>€ {row.total_revenue.toFixed(2)}</td>
                         </tr>
                       ))
                     )}
@@ -1086,36 +1166,357 @@ export default function OwnerPage() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  page: { padding: 16, backgroundColor: '#f5f5f5', minHeight: '100vh', color: '#111' },
-  loginPage: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f5f5f5', padding: 16 },
-  loginCard: { width: '100%', maxWidth: 420, backgroundColor: '#fff', border: '1px solid #ddd', borderRadius: 12, padding: 20 },
-  topBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 16, flexWrap: 'wrap' },
-  title: { fontSize: 28, margin: 0, color: '#111' },
-  subtitle: { margin: '4px 0 0 0', color: '#555', fontSize: 14 },
-  layout: { display: 'grid', gridTemplateColumns: '320px 1fr', gap: 16 },
-  leftColumn: { display: 'flex', flexDirection: 'column', gap: 16 },
-  rightColumn: { display: 'flex', flexDirection: 'column', gap: 16 },
-  card: { backgroundColor: '#fff', border: '1px solid #ddd', borderRadius: 10, padding: 16 },
-  sectionTitle: { fontSize: 18, margin: '0 0 12px 0', color: '#111' },
-  formRow: { display: 'flex', gap: 8 },
-  formGrid: { display: 'grid', gap: 10 },
-  input: { width: '100%', padding: '9px 10px', borderRadius: 6, border: '1px solid #ccc', fontSize: 14, backgroundColor: '#fff', color: '#111' },
-  label: { display: 'block', marginBottom: 4, fontSize: 12, color: '#444' },
-  primaryButton: { padding: '9px 12px', borderRadius: 6, border: 'none', backgroundColor: '#111', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 },
-  secondaryButton: { padding: '9px 12px', borderRadius: 6, border: '1px solid #ccc', backgroundColor: '#fff', color: '#111', cursor: 'pointer', fontSize: 14 },
-  primaryButtonSmall: { padding: '7px 10px', borderRadius: 6, border: 'none', backgroundColor: '#111', color: '#fff', cursor: 'pointer', fontSize: 13 },
-  secondaryButtonSmall: { padding: '7px 10px', borderRadius: 6, border: '1px solid #ccc', backgroundColor: '#fff', color: '#111', cursor: 'pointer', fontSize: 13 },
-  redButton: { padding: '7px 10px', borderRadius: 6, border: '1px solid #b91c1c', backgroundColor: '#dc2626', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600 },
-  bigDangerButton: { padding: '12px 18px', borderRadius: 8, border: '2px solid #991b1b', backgroundColor: '#dc2626', color: '#fff', cursor: 'pointer', fontSize: 15, fontWeight: 700, letterSpacing: 0.4 },
-  categoryRow: { display: 'flex', gap: 8, alignItems: 'center' },
-  categoryFilterButton: { padding: '9px 10px', borderRadius: 6, border: '1px solid #ccc', cursor: 'pointer', textAlign: 'left', fontSize: 14 },
-  productsHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 12 },
-  reportControls: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
-  smallText: { fontSize: 12, color: '#666', margin: 0 },
-  tableWrap: { overflowX: 'auto' },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: { textAlign: 'left', fontSize: 12, color: '#666', borderBottom: '1px solid #ddd', padding: '10px 8px', whiteSpace: 'nowrap' },
-  td: { padding: '10px 8px', borderBottom: '1px solid #eee', verticalAlign: 'middle', fontSize: 14, color: '#111' },
-  emptyTd: { padding: '20px 8px', textAlign: 'center', color: '#777', fontSize: 14 },
-  actionsRow: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
+  page: {
+    padding: 12,
+    backgroundColor: '#f5f5f5',
+    minHeight: '100vh',
+    color: '#111',
+  },
+  loginPage: {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f5f5f5',
+    padding: 16,
+  },
+  loginCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#fff',
+    border: '1px solid #ddd',
+    borderRadius: 12,
+    padding: 20,
+  },
+  topBar: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 16,
+    marginBottom: 16,
+    flexWrap: 'wrap',
+  },
+  title: {
+    fontSize: 28,
+    margin: 0,
+    color: '#111',
+  },
+  subtitle: {
+    margin: '4px 0 0 0',
+    color: '#555',
+    fontSize: 14,
+    lineHeight: 1.4,
+  },
+  layout: {
+    display: 'grid',
+    gap: 16,
+  },
+  leftColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 16,
+  },
+  rightColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 16,
+  },
+  card: {
+    backgroundColor: '#fff',
+    border: '1px solid #ddd',
+    borderRadius: 12,
+    padding: 14,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    margin: '0 0 12px 0',
+    color: '#111',
+  },
+  formRow: {
+    display: 'flex',
+    gap: 8,
+    alignItems: 'stretch',
+  },
+  formColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+  },
+  formGrid: {
+    display: 'grid',
+    gap: 10,
+  },
+  input: {
+    width: '100%',
+    padding: '11px 12px',
+    borderRadius: 8,
+    border: '1px solid #ccc',
+    fontSize: 14,
+    backgroundColor: '#fff',
+    color: '#111',
+    minHeight: 44,
+  },
+  label: {
+    display: 'block',
+    marginBottom: 4,
+    fontSize: 12,
+    color: '#444',
+    fontWeight: 600,
+  },
+  primaryButton: {
+    padding: '10px 14px',
+    borderRadius: 8,
+    border: 'none',
+    backgroundColor: '#111',
+    color: '#fff',
+    cursor: 'pointer',
+    fontSize: 14,
+    fontWeight: 600,
+    minHeight: 44,
+  },
+  primaryButtonWide: {
+    width: '100%',
+    padding: '11px 14px',
+    borderRadius: 8,
+    border: 'none',
+    backgroundColor: '#111',
+    color: '#fff',
+    cursor: 'pointer',
+    fontSize: 14,
+    fontWeight: 600,
+    minHeight: 44,
+  },
+  secondaryButton: {
+    padding: '10px 14px',
+    borderRadius: 8,
+    border: '1px solid #ccc',
+    backgroundColor: '#fff',
+    color: '#111',
+    cursor: 'pointer',
+    fontSize: 14,
+    minHeight: 44,
+  },
+  secondaryButtonWide: {
+    width: '100%',
+    padding: '11px 14px',
+    borderRadius: 8,
+    border: '1px solid #ccc',
+    backgroundColor: '#fff',
+    color: '#111',
+    cursor: 'pointer',
+    fontSize: 14,
+    minHeight: 44,
+  },
+  primaryButtonSmall: {
+    padding: '8px 10px',
+    borderRadius: 8,
+    border: 'none',
+    backgroundColor: '#111',
+    color: '#fff',
+    cursor: 'pointer',
+    fontSize: 13,
+    minHeight: 38,
+  },
+  primaryButtonWideSmall: {
+    width: '100%',
+    padding: '9px 10px',
+    borderRadius: 8,
+    border: 'none',
+    backgroundColor: '#111',
+    color: '#fff',
+    cursor: 'pointer',
+    fontSize: 13,
+    minHeight: 38,
+  },
+  secondaryButtonSmall: {
+    padding: '8px 10px',
+    borderRadius: 8,
+    border: '1px solid #ccc',
+    backgroundColor: '#fff',
+    color: '#111',
+    cursor: 'pointer',
+    fontSize: 13,
+    minHeight: 38,
+  },
+  secondaryButtonWideSmall: {
+    width: '100%',
+    padding: '9px 10px',
+    borderRadius: 8,
+    border: '1px solid #ccc',
+    backgroundColor: '#fff',
+    color: '#111',
+    cursor: 'pointer',
+    fontSize: 13,
+    minHeight: 38,
+  },
+  redButton: {
+    padding: '8px 10px',
+    borderRadius: 8,
+    border: '1px solid #b91c1c',
+    backgroundColor: '#dc2626',
+    color: '#fff',
+    cursor: 'pointer',
+    fontSize: 13,
+    fontWeight: 600,
+    minHeight: 38,
+  },
+  redButtonWide: {
+    width: '100%',
+    padding: '10px 12px',
+    borderRadius: 8,
+    border: '1px solid #b91c1c',
+    backgroundColor: '#dc2626',
+    color: '#fff',
+    cursor: 'pointer',
+    fontSize: 13,
+    fontWeight: 600,
+    minHeight: 40,
+  },
+  redButtonWideSmall: {
+    width: '100%',
+    padding: '9px 10px',
+    borderRadius: 8,
+    border: '1px solid #b91c1c',
+    backgroundColor: '#dc2626',
+    color: '#fff',
+    cursor: 'pointer',
+    fontSize: 13,
+    fontWeight: 600,
+    minHeight: 38,
+  },
+  bigDangerButton: {
+    padding: '12px 18px',
+    borderRadius: 8,
+    border: '2px solid #991b1b',
+    backgroundColor: '#dc2626',
+    color: '#fff',
+    cursor: 'pointer',
+    fontSize: 15,
+    fontWeight: 700,
+    letterSpacing: 0.4,
+    minHeight: 48,
+  },
+  bigDangerButtonWide: {
+    width: '100%',
+    padding: '12px 16px',
+    borderRadius: 8,
+    border: '2px solid #991b1b',
+    backgroundColor: '#dc2626',
+    color: '#fff',
+    cursor: 'pointer',
+    fontSize: 14,
+    fontWeight: 700,
+    letterSpacing: 0.2,
+    minHeight: 48,
+  },
+  categoryRow: {
+    display: 'flex',
+    gap: 8,
+    alignItems: 'center',
+  },
+  categoryRowMobile: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    alignItems: 'stretch',
+  },
+  categoryFilterButton: {
+    padding: '10px 12px',
+    borderRadius: 8,
+    border: '1px solid #ccc',
+    cursor: 'pointer',
+    textAlign: 'left',
+    fontSize: 14,
+    minHeight: 44,
+  },
+  productsHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: 12,
+    alignItems: 'flex-end',
+    flexWrap: 'wrap',
+    marginBottom: 12,
+  },
+  productsHeaderMobile: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+    alignItems: 'stretch',
+    marginBottom: 12,
+  },
+  reportControls: {
+    display: 'flex',
+    gap: 8,
+    flexWrap: 'wrap',
+    alignItems: 'center',
+  },
+  reportControlsMobile: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    width: '100%',
+  },
+  smallText: {
+    fontSize: 12,
+    color: '#666',
+    margin: 0,
+    lineHeight: 1.4,
+  },
+  tableWrap: {
+    overflowX: 'auto',
+    WebkitOverflowScrolling: 'touch',
+  },
+  table: {
+    width: '100%',
+    minWidth: 680,
+    borderCollapse: 'collapse',
+  },
+  th: {
+    textAlign: 'left',
+    fontSize: 12,
+    color: '#666',
+    borderBottom: '1px solid #ddd',
+    padding: '10px 8px',
+    whiteSpace: 'nowrap',
+  },
+  td: {
+    padding: '10px 8px',
+    borderBottom: '1px solid #eee',
+    verticalAlign: 'middle',
+    fontSize: 14,
+    color: '#111',
+  },
+  emptyTd: {
+    padding: '20px 8px',
+    textAlign: 'center',
+    color: '#777',
+    fontSize: 14,
+  },
+  actionsRow: {
+    display: 'flex',
+    gap: 8,
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  actionsColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    alignItems: 'stretch',
+    minWidth: 110,
+  },
+  inlineButtons: {
+    marginTop: 12,
+    display: 'flex',
+    gap: 8,
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  stackButtons: {
+    marginTop: 12,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    width: '100%',
+  },
 };
