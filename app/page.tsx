@@ -13,6 +13,9 @@ const buttonStyle: CSSProperties = {
   fontSize: 16,
   fontWeight: 600,
   cursor: "pointer",
+  display: "block",
+  position: "relative",
+  zIndex: 1,
 };
 
 const ownerButtonStyle: CSSProperties = {
@@ -45,24 +48,47 @@ export default function HomePage() {
           boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
           display: "grid",
           gap: 14,
+          position: "relative",
+          zIndex: 1,
         }}
       >
-        <h1 style={{ fontSize: 28, margin: 0, textAlign: "center" }}>NUR APP BAR</h1>
-        <p style={{ margin: 0, textAlign: "center", color: "#666" }}>Seleziona area</p>
+        <h1 style={{ fontSize: 28, margin: 0, textAlign: "center" }}>
+          NUR APP BAR
+        </h1>
 
-        <button onClick={() => router.push("/staff")} style={buttonStyle}>
+        <p style={{ margin: 0, textAlign: "center", color: "#666" }}>
+          Seleziona area
+        </p>
+
+        <button
+          type="button"
+          onClick={() => router.push("/staff")}
+          style={buttonStyle}
+        >
           PER SALA
         </button>
 
-        <button onClick={() => router.push("/bar")} style={buttonStyle}>
+        <button
+          type="button"
+          onClick={() => router.push("/bar")}
+          style={buttonStyle}
+        >
           NOTIFICHE BAR
         </button>
 
-        <button onClick={() => router.push("/kitchen")} style={buttonStyle}>
+        <button
+          type="button"
+          onClick={() => router.push("/kitchen")}
+          style={buttonStyle}
+        >
           NOTIFICHE CUCINA
         </button>
 
-        <button onClick={() => router.push("/owner")} style={ownerButtonStyle}>
+        <button
+          type="button"
+          onClick={() => router.push("/owner")}
+          style={ownerButtonStyle}
+        >
           AREA OWNER
         </button>
       </div>
