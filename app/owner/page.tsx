@@ -87,6 +87,8 @@ export default function OwnerPage() {
   const [editCategoryId, setEditCategoryId] = useState('');
   const [editDestination, setEditDestination] = useState<Destination>('bar');
 
+  const [showOwnerCredentials, setShowOwnerCredentials] = useState(false);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -601,7 +603,7 @@ export default function OwnerPage() {
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr',
+        gridTemplateColumns: '1fr 1fr',
         gap: 6,
         width: '100%',
       }}
@@ -733,36 +735,50 @@ export default function OwnerPage() {
         >
           <section style={styles.leftColumn}>
             <div style={styles.card}>
-              <h2 style={styles.sectionTitle}>Credenziali Owner</h2>
-              <div style={styles.formGrid}>
-                <div>
-                  <label style={styles.label}>Nome utente</label>
-                  <input
-                    type="text"
-                    value={settingsUsername}
-                    onChange={(e) => setSettingsUsername(e.target.value)}
-                    style={styles.input}
-                  />
+              <button
+                type="button"
+                onClick={() => setShowOwnerCredentials((prev) => !prev)}
+                style={styles.dropdownButton}
+              >
+                <span>Credenziali owner</span>
+                <span style={styles.dropdownArrow}>
+                  {showOwnerCredentials ? '▲' : '▼'}
+                </span>
+              </button>
+
+              {showOwnerCredentials && (
+                <div style={{ marginTop: 12 }}>
+                  <div style={styles.formGrid}>
+                    <div>
+                      <label style={styles.label}>Nome utente</label>
+                      <input
+                        type="text"
+                        value={settingsUsername}
+                        onChange={(e) => setSettingsUsername(e.target.value)}
+                        style={styles.input}
+                      />
+                    </div>
+                    <div>
+                      <label style={styles.label}>Password</label>
+                      <input
+                        type="password"
+                        value={settingsPassword}
+                        onChange={(e) => setSettingsPassword(e.target.value)}
+                        style={styles.input}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 12 }}>
+                    <button
+                      type="button"
+                      onClick={handleSaveOwnerCredentials}
+                      style={isMobile ? styles.primaryButtonWide : styles.primaryButton}
+                    >
+                      Salva credenziali
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <label style={styles.label}>Password</label>
-                  <input
-                    type="password"
-                    value={settingsPassword}
-                    onChange={(e) => setSettingsPassword(e.target.value)}
-                    style={styles.input}
-                  />
-                </div>
-              </div>
-              <div style={{ marginTop: 12 }}>
-                <button
-                  type="button"
-                  onClick={handleSaveOwnerCredentials}
-                  style={isMobile ? styles.primaryButtonWide : styles.primaryButton}
-                >
-                  Salva credenziali
-                </button>
-              </div>
+              )}
             </div>
 
             <div style={styles.card}>
@@ -1035,14 +1051,22 @@ export default function OwnerPage() {
                                     <button
                                       type="button"
                                       onClick={handleSaveItem}
-                                      style={isMobile ? styles.primaryButtonWideSmall : styles.primaryButtonSmall}
+                                      style={
+                                        isMobile
+                                          ? styles.primaryButtonWideSmall
+                                          : styles.primaryButtonSmall
+                                      }
                                     >
                                       Salva
                                     </button>
                                     <button
                                       type="button"
                                       onClick={cancelEditItem}
-                                      style={isMobile ? styles.secondaryButtonWideSmall : styles.secondaryButtonSmall}
+                                      style={
+                                        isMobile
+                                          ? styles.secondaryButtonWideSmall
+                                          : styles.secondaryButtonSmall
+                                      }
                                     >
                                       Annulla
                                     </button>
@@ -1052,7 +1076,11 @@ export default function OwnerPage() {
                                     <button
                                       type="button"
                                       onClick={() => startEditItem(item)}
-                                      style={isMobile ? styles.secondaryButtonWideSmall : styles.secondaryButtonSmall}
+                                      style={
+                                        isMobile
+                                          ? styles.secondaryButtonWideSmall
+                                          : styles.secondaryButtonSmall
+                                      }
                                     >
                                       Modifica
                                     </button>
@@ -1518,5 +1546,27 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: 8,
     width: '100%',
+  },
+  dropdownButton: {
+    width: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    padding: '12px 14px',
+    borderRadius: 10,
+    border: '1px solid #d1d5db',
+    backgroundColor: '#f9fafb',
+    color: '#111',
+    cursor: 'pointer',
+    fontSize: 16,
+    fontWeight: 700,
+    textAlign: 'left',
+    minHeight: 48,
+  },
+  dropdownArrow: {
+    fontSize: 14,
+    color: '#555',
+    flexShrink: 0,
   },
 };
