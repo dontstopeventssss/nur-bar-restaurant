@@ -265,7 +265,7 @@ export default function StaffPage() {
         }}
       >
         <div style={{ flex: 1, minWidth: 220 }}>
-          abel
+          <label
             htmlFor="search-table"
             style={{ fontSize: 12, display: 'block', marginBottom: 2 }}
           >
@@ -297,7 +297,7 @@ export default function StaffPage() {
           }}
         >
           <div style={{ flex: 1 }}>
-            abel
+            <label
               htmlFor="new-table"
               style={{ fontSize: 12, display: 'block', marginBottom: 2 }}
             >
@@ -517,3 +517,103 @@ export default function StaffPage() {
         <h2 style={{ marginBottom: 8, fontSize: 16 }}>
           Tavoli (ordinati per numero)
         </h2>
+        {filteredTables.length === 0 ? (
+          <p style={{ fontSize: 13, color: '#bd9292' }}>
+            Nessun tavolo trovato con questa ricerca.
+          </p>
+        ) : (
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            {filteredTables.map((t) => {
+              const pos = getPos(t);
+              const isDragging = t.id === draggingId;
+              return (
+                <li
+                  key={t.id}
+                  style={{
+                    marginBottom: 8,
+                    padding: 8,
+                    borderRadius: 6,
+                    border: isDragging ? '2px solid #01696f' : '1px solid #ddd',
+                    backgroundColor: '#919092',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>
+                      Tavolo {t.name}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#554141' }}>
+                      Stato: <strong>{t.status}</strong> • x:{' '}
+                      {pos.x}px, y: {pos.y}px
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 4,
+                      justifyContent: 'flex-end',
+                    }}
+                  >
+                    <button
+                      onClick={() => changeStatus(t.id, 'libero')}
+                      style={statusBtnStyle}
+                    >
+                      🟢
+                    </button>
+                    <button
+                      onClick={() => changeStatus(t.id, 'prenotato')}
+                      style={statusBtnStyle}
+                    >
+                      🟠
+                    </button>
+                    <button
+                      onClick={() => changeStatus(t.id, 'occupato')}
+                      style={statusBtnStyle}
+                    >
+                      🔴
+                    </button>
+
+                    <button
+                      onClick={() => router.push(`/staff/table/${t.id}`)}
+                      style={{
+                        ...statusBtnStyle,
+                        backgroundColor: '#01696f',
+                        color: 'white',
+                      }}
+                    >
+                      📋 Ordine
+                    </button>
+
+                    <button
+                      onClick={() => handleDeleteTable(t.id)}
+                      style={{
+                        ...statusBtnStyle,
+                        backgroundColor: '#f13434',
+                        color: '#f5d7d7',
+                      }}
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+    </main>
+  );
+}
+
+const statusBtnStyle = {
+  padding: '2px 6px',
+  borderRadius: 4,
+  fontSize: 12,
+  cursor: 'pointer',
+  border: '1px solid #ffffff',
+  backgroundColor: 'white',
+} as const;
