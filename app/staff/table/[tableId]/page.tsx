@@ -36,6 +36,7 @@ type MenuItem = {
   name: string;
   price: number;
   destination: string | null;
+  is_fuori_menu?: boolean;
 };
 
 type OrderItem = {
@@ -46,6 +47,7 @@ type OrderItem = {
   price: number;
   quantity: number;
   notes: string | null;
+  is_fuori_menu?: boolean;
 };
 
 type OrderItemsMap = Record<string, OrderItem>;
@@ -73,6 +75,7 @@ export default function TableOrderPage() {
   const [newProductPrice, setNewProductPrice] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [newProductDestination, setNewProductDestination] = useState<'bar' | 'kitchen'>('bar');
 
   useEffect(() => {
     const loadData = async () => {
@@ -122,13 +125,13 @@ export default function TableOrderPage() {
         const loadedCategories = (categoriesData as MenuCategory[]) ?? [];
         setCategories(loadedCategories);
 
-        if (loadedCategories.length > 0) {
+        if (loadedCategories.length > 0 && !selectedCategoryId) {
           setSelectedCategoryId(loadedCategories[0].id);
         }
 
         const { data: itemsData, error: itemsError } = await supabase
           .from('menu_items')
-          .select('id, category_id, name, price, destination')
+          .select('id, category_id, name, price, destination, is_fuori_menu')
           .order('name', { ascending: true });
 
         if (itemsError) {
@@ -162,7 +165,7 @@ export default function TableOrderPage() {
     if (tableId) {
       loadData();
     }
-  }, [tableId]);
+  }, [tableId, selectedCategoryId]);
 
   const filteredMenuItems = useMemo(() => {
     const q = productSearch.trim().toLowerCase();
@@ -181,11 +184,9 @@ export default function TableOrderPage() {
 
   const total = useMemo(() => {
     return Object.values(orderItems).reduce((sum, oi) => {
-      const menuItem = menuItems.find((m) => m.id === oi.menu_item_id);
-      const price = menuItem?.price ?? 0;
-      return sum + oi.quantity * price;
+      return sum + oi.quantity * Number(oi.price ?? 0);
     }, 0);
-  }, [orderItems, menuItems]);
+  }, [orderItems]);
 
   const pendingTotal = useMemo(() => {
     return Object.entries(pendingItems).reduce((sum, [menuItemId, qty]) => {
@@ -251,6 +252,7 @@ export default function TableOrderPage() {
           price: item.price,
           quantity: newQty,
           notes: null,
+          is_fuori_menu: item.is_fuori_menu ?? false,
         },
       };
     });
@@ -301,12 +303,23 @@ export default function TableOrderPage() {
         if (existingRow) {
           await supabase
             .from('order_items')
-            .update({ quantity: finalQty })
+            .update({
+              quantity: finalQty,
+              price: item.price,
+              item_name: item.name,
+              is_fuori_menu: item.is_fuori_menu ?? false,
+            })
             .eq('id', existingRow.id);
 
           setOrderItems((prev) => ({
             ...prev,
-            [menuItemId]: { ...existingRow, quantity: finalQty },
+            [menuItemId]: {
+              ...existingRow,
+              quantity: finalQty,
+              price: item.price,
+              item_name: item.name,
+              is_fuori_menu: item.is_fuori_menu ?? false,
+            },
           }));
         } else {
           const { data: newRow, error: insertError } = await supabase
@@ -318,6 +331,7 @@ export default function TableOrderPage() {
               price: item.price,
               quantity: finalQty,
               notes: null,
+              is_fuori_menu: item.is_fuori_menu ?? false,
             })
             .select()
             .single();
@@ -336,7 +350,9 @@ export default function TableOrderPage() {
           .from('notifications')
           .insert({
             type: 'ordine',
-            message: `Tavolo ${table?.name ?? tableId}: ${addedQty}x ${item.name}`,
+            message: `Tavolo ${table?.name ?? tableId}: ${addedQty}x ${item.name}${
+              item.is_fuori_menu ? ' (fuori menù)' : ''
+            }`,
             target_role: item.destination ?? 'bar',
             read: false,
           });
@@ -440,7 +456,13 @@ export default function TableOrderPage() {
 
       const { data: createdItem, error: itemError } = await supabase
         .from('menu_items')
-        .insert({ category_id: categoryId, name, price })
+        .insert({
+          category_id: categoryId,
+          name,
+          price,
+          destination: newProductDestination,
+          is_fuori_menu: true,
+        })
         .select()
         .single();
 
@@ -458,6 +480,7 @@ export default function TableOrderPage() {
       setNewProductName('');
       setNewProductPrice('');
       setNewCategoryName('');
+      setNewProductDestination('bar');
       setShowCreateProduct(false);
 
       handleChangeQuantity(item, 1);
@@ -742,6 +765,20 @@ export default function TableOrderPage() {
                 style={inputStyle}
               />
             </div>
+
+            <div>
+              <label style={labelStyle}>Destinazione</label>
+              <select
+                value={newProductDestination}
+                onChange={(e) =>
+                  setNewProductDestination(e.target.value as 'bar' | 'kitchen')
+                }
+                style={inputStyle}
+              >
+                <option value="bar">Bar</option>
+                <option value="kitchen">Cucina</option>
+              </select>
+            </div>
           </div>
 
           <div style={{ marginTop: 12 }}>
@@ -821,6 +858,21 @@ export default function TableOrderPage() {
                       <div>
                         <div style={{ fontSize: 14, fontWeight: 500, color: '#111' }}>
                           {item.name}
+                          {item.is_fuori_menu && (
+                            <span
+                              style={{
+                                marginLeft: 8,
+                                fontSize: 10,
+                                fontWeight: 700,
+                                padding: '2px 6px',
+                                borderRadius: 999,
+                                backgroundColor: '#fee2e2',
+                                color: '#991b1b',
+                              }}
+                            >
+                              FUORI MENÙ
+                            </span>
+                          )}
                         </div>
 
                         <span style={{ fontSize: 10, color: '#888', fontWeight: 500 }}>
