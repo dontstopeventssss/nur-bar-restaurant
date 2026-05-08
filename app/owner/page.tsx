@@ -22,6 +22,7 @@ type MenuItem = {
   name: string;
   price: number;
   destination: Destination | null;
+  is_fuori_menu?: boolean;
 };
 
 type OrderRow = {
@@ -36,12 +37,14 @@ type OrderItemRow = {
   item_name: string;
   quantity: number;
   price: number;
+  is_fuori_menu?: boolean;
 };
 
 type SalesReportRow = {
   item_name: string;
   total_quantity: number;
   total_revenue: number;
+  is_fuori_menu: boolean;
 };
 
 type ReportRange = 'today' | 'week' | 'month' | 'all';
@@ -80,7 +83,8 @@ export default function OwnerPage() {
   const [newProductName, setNewProductName] = useState('');
   const [newProductPrice, setNewProductPrice] = useState('');
   const [newProductCategoryId, setNewProductCategoryId] = useState('');
-  const [newProductDestination, setNewProductDestination] = useState<Destination>('bar');
+  const [newProductDestination, setNewProductDestination] =
+    useState<Destination>('bar');
 
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
@@ -214,19 +218,27 @@ export default function OwnerPage() {
 
         const grouped: Record<
           string,
-          { item_name: string; total_quantity: number; total_revenue: number }
+          {
+            item_name: string;
+            total_quantity: number;
+            total_revenue: number;
+            is_fuori_menu: boolean;
+          }
         > = {};
 
         rows
           .filter((row) => validOrderIds.has(row.order_id))
           .forEach((row) => {
-            const key = row.item_name ?? 'Prodotto sconosciuto';
+            const cleanName = row.item_name ?? 'Prodotto sconosciuto';
+            const isFuoriMenu = Boolean(row.is_fuori_menu);
+            const key = `${isFuoriMenu ? 'fuori' : 'menu'}::${cleanName}`;
 
             if (!grouped[key]) {
               grouped[key] = {
-                item_name: key,
+                item_name: cleanName,
                 total_quantity: 0,
                 total_revenue: 0,
+                is_fuori_menu: isFuoriMenu,
               };
             }
 
@@ -407,6 +419,7 @@ export default function OwnerPage() {
           price,
           category_id: categoryId,
           destination: newProductDestination,
+          is_fuori_menu: false,
         })
         .select()
         .single();
@@ -677,7 +690,11 @@ export default function OwnerPage() {
           </div>
 
           <div style={styles.stackButtonsCompact}>
-            <button type="button" onClick={handleLogin} style={styles.primaryButtonWide}>
+            <button
+              type="button"
+              onClick={handleLogin}
+              style={styles.primaryButtonWide}
+            >
               Entra
             </button>
             <button
@@ -803,9 +820,12 @@ export default function OwnerPage() {
                   onClick={() => setSelectedCategoryFilter('all')}
                   style={{
                     ...styles.categoryLineButton,
-                    backgroundColor: selectedCategoryFilter === 'all' ? '#111' : '#fff',
-                    color: selectedCategoryFilter === 'all' ? '#fff' : '#111',
-                    borderColor: selectedCategoryFilter === 'all' ? '#111' : '#ddd',
+                    backgroundColor:
+                      selectedCategoryFilter === 'all' ? '#111' : '#fff',
+                    color:
+                      selectedCategoryFilter === 'all' ? '#fff' : '#111',
+                    borderColor:
+                      selectedCategoryFilter === 'all' ? '#111' : '#ddd',
                   }}
                 >
                   Tutte le categorie
@@ -914,7 +934,11 @@ export default function OwnerPage() {
 
           <section style={styles.rightColumn}>
             <div style={styles.cardCompact}>
-              <div style={isMobile ? styles.productsHeaderMobile : styles.productsHeader}>
+              <div
+                style={
+                  isMobile ? styles.productsHeaderMobile : styles.productsHeader
+                }
+              >
                 <div style={{ minWidth: 0 }}>
                   <h2 style={styles.sectionTitle}>Prodotti menu</h2>
                   <p style={styles.smallText}>
@@ -974,7 +998,32 @@ export default function OwnerPage() {
                                   style={styles.input}
                                 />
                               ) : (
-                                item.name
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                    flexWrap: 'wrap',
+                                  }}
+                                >
+                                  <span>{item.name}</span>
+                                  {item.is_fuori_menu && (
+                                    <span
+                                      style={{
+                                        fontSize: 10,
+                                        fontWeight: 700,
+                                        padding: '3px 6px',
+                                        borderRadius: 999,
+                                        backgroundColor: '#fee2e2',
+                                        color: '#991b1b',
+                                        whiteSpace: 'nowrap',
+                                        display: 'inline-block',
+                                      }}
+                                    >
+                                      FUORI MENÙ
+                                    </span>
+                                  )}
+                                </div>
                               )}
                             </td>
 
@@ -1041,20 +1090,32 @@ export default function OwnerPage() {
                             </td>
 
                             <td style={styles.td}>
-                              <div style={isMobile ? styles.actionsColumn : styles.actionsRow}>
+                              <div
+                                style={
+                                  isMobile ? styles.actionsColumn : styles.actionsRow
+                                }
+                              >
                                 {isEditing ? (
                                   <>
                                     <button
                                       type="button"
                                       onClick={handleSaveItem}
-                                      style={isMobile ? styles.primaryButtonMiniWide : styles.primaryButtonMini}
+                                      style={
+                                        isMobile
+                                          ? styles.primaryButtonMiniWide
+                                          : styles.primaryButtonMini
+                                      }
                                     >
                                       Salva
                                     </button>
                                     <button
                                       type="button"
                                       onClick={cancelEditItem}
-                                      style={isMobile ? styles.secondaryButtonMiniWide : styles.secondaryButtonMini}
+                                      style={
+                                        isMobile
+                                          ? styles.secondaryButtonMiniWide
+                                          : styles.secondaryButtonMini
+                                      }
                                     >
                                       Annulla
                                     </button>
@@ -1064,14 +1125,24 @@ export default function OwnerPage() {
                                     <button
                                       type="button"
                                       onClick={() => startEditItem(item)}
-                                      style={isMobile ? styles.secondaryButtonMiniWide : styles.secondaryButtonMini}
+                                      style={
+                                        isMobile
+                                          ? styles.secondaryButtonMiniWide
+                                          : styles.secondaryButtonMini
+                                      }
                                     >
                                       Modifica
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => handleDeleteItem(item.id, item.name)}
-                                      style={isMobile ? styles.redButtonMiniWide : styles.redButtonMini}
+                                      onClick={() =>
+                                        handleDeleteItem(item.id, item.name)
+                                      }
+                                      style={
+                                        isMobile
+                                          ? styles.redButtonMiniWide
+                                          : styles.redButtonMini
+                                      }
                                     >
                                       Elimina
                                     </button>
@@ -1089,7 +1160,11 @@ export default function OwnerPage() {
             </div>
 
             <div style={styles.cardCompact}>
-              <div style={isMobile ? styles.productsHeaderMobile : styles.productsHeader}>
+              <div
+                style={
+                  isMobile ? styles.productsHeaderMobile : styles.productsHeader
+                }
+              >
                 <div style={{ minWidth: 0 }}>
                   <h2 style={styles.sectionTitle}>Report prodotti più venduti</h2>
                   <p style={styles.smallText}>
@@ -1097,10 +1172,16 @@ export default function OwnerPage() {
                   </p>
                 </div>
 
-                <div style={isMobile ? styles.reportControlsMobile : styles.reportControls}>
+                <div
+                  style={
+                    isMobile ? styles.reportControlsMobile : styles.reportControls
+                  }
+                >
                   <select
                     value={reportRange}
-                    onChange={(e) => setReportRange(e.target.value as ReportRange)}
+                    onChange={(e) =>
+                      setReportRange(e.target.value as ReportRange)
+                    }
                     style={{
                       ...styles.input,
                       minWidth: isMobile ? 0 : 130,
@@ -1135,7 +1216,13 @@ export default function OwnerPage() {
                 >
                   ELIMINA DATI STORICI REPORT
                 </button>
-                <p style={{ ...styles.smallText, marginTop: 6, color: '#991b1b' }}>
+                <p
+                  style={{
+                    ...styles.smallText,
+                    marginTop: 6,
+                    color: '#991b1b',
+                  }}
+                >
                   Elimina ordini e righe ordine del periodo selezionato.
                 </p>
               </div>
@@ -1161,9 +1248,38 @@ export default function OwnerPage() {
                       filteredReportRows.map((row, index) => (
                         <tr key={`${row.item_name}-${index}`}>
                           <td style={styles.td}>{index + 1}</td>
-                          <td style={styles.td}>{row.item_name}</td>
+                          <td style={styles.td}>
+                            <div
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                flexWrap: 'wrap',
+                              }}
+                            >
+                              <span>{row.item_name}</span>
+                              {row.is_fuori_menu && (
+                                <span
+                                  style={{
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    padding: '3px 6px',
+                                    borderRadius: 999,
+                                    backgroundColor: '#fee2e2',
+                                    color: '#991b1b',
+                                    whiteSpace: 'nowrap',
+                                    display: 'inline-block',
+                                  }}
+                                >
+                                  FUORI MENÙ
+                                </span>
+                              )}
+                            </div>
+                          </td>
                           <td style={styles.td}>{row.total_quantity}</td>
-                          <td style={styles.td}>€ {row.total_revenue.toFixed(2)}</td>
+                          <td style={styles.td}>
+                            € {row.total_revenue.toFixed(2)}
+                          </td>
                         </tr>
                       ))
                     )}
@@ -1318,7 +1434,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: '100%',
     padding: '7px 10px',
     borderRadius: 6,
-    border: '1px solid #ccc',
+    border: '1px solid '#ccc',
     backgroundColor: '#fff',
     color: '#111',
     cursor: 'pointer',
