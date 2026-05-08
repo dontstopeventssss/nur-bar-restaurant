@@ -1434,7 +1434,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: '100%',
     padding: '7px 10px',
     borderRadius: 6,
-    border: '1px solid '#ccc',
+    border: '1px solid #ccc',
     backgroundColor: '#fff',
     color: '#111',
     cursor: 'pointer',
