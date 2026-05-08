@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 
@@ -24,9 +24,18 @@ export default function KitchenPage() {
   const [loading, setLoading] = useState(true);
   const [clearing, setClearing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const loadNotifications = useCallback(async () => {
-    setLoading(true);
+  const sortNotifications = useCallback((rows: NotificationRow[]) => {
+    return [...rows].sort((a, b) => {
+      const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return aTime - bTime;
+    });
+  }, []);
+
+  const loadNotifications = useCallback(async (showLoader = true) => {
+    if (showLoader) setLoading(true);
     setErrorMessage(null);
 
     const { data, error } = await supabase
@@ -40,11 +49,21 @@ export default function KitchenPage() {
       setErrorMessage('Errore nel caricamento notifiche cucina.');
       setNotifications([]);
     } else {
-      setNotifications((data as NotificationRow[]) ?? []);
+      setNotifications(sortNotifications((data as NotificationRow[]) ?? []));
     }
 
-    setLoading(false);
-  }, []);
+    if (showLoader) setLoading(false);
+  }, [sortNotifications]);
+
+  const scheduleSilentRefresh = useCallback(() => {
+    if (refreshTimeoutRef.current) {
+      clearTimeout(refreshTimeoutRef.current);
+    }
+
+    refreshTimeoutRef.current = setTimeout(() => {
+      loadNotifications(false);
+    }, 700);
+  }, [loadNotifications]);
 
   useEffect(() => {
     loadNotifications();
@@ -53,17 +72,69 @@ export default function KitchenPage() {
       .channel('kitchen-notifications-realtime')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'notifications' },
-        () => {
-          loadNotifications();
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: 'target_role=eq.kitchen',
+        },
+        (payload) => {
+          const newRow = payload.new as NotificationRow;
+
+          setNotifications((prev) => {
+            const alreadyExists = prev.some((n) => n.id === newRow.id);
+            if (alreadyExists) return prev;
+            return sortNotifications([...prev, newRow]);
+          });
+
+          scheduleSilentRefresh();
         }
       )
-      .subscribe();
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'notifications',
+          filter: 'target_role=eq.kitchen',
+        },
+        (payload) => {
+          const updatedRow = payload.new as NotificationRow;
+
+          setNotifications((prev) =>
+            sortNotifications(
+              prev.map((n) => (n.id === updatedRow.id ? updatedRow : n))
+            )
+          );
+
+          scheduleSilentRefresh();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'notifications',
+          filter: 'target_role=eq.kitchen',
+        },
+        (payload) => {
+          const oldRow = payload.old as NotificationRow;
+          setNotifications((prev) => prev.filter((n) => n.id !== oldRow.id));
+          scheduleSilentRefresh();
+        }
+      )
+      .subscribe((status) => {
+        console.log('Kitchen realtime status:', status);
+      });
 
     return () => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
       supabase.removeChannel(channel);
     };
-  }, [loadNotifications]);
+  }, [loadNotifications, scheduleSilentRefresh, sortNotifications]);
 
   const pendingOrders = useMemo(
     () => notifications.filter((n) => n.type !== 'completed'),
@@ -78,6 +149,12 @@ export default function KitchenPage() {
   const markAsCompleted = async (id: string) => {
     setErrorMessage(null);
 
+    setNotifications((prev) =>
+      prev.map((n) =>
+        n.id === id ? { ...n, type: 'completed', read: true } : n
+      )
+    );
+
     const { error } = await supabase
       .from('notifications')
       .update({ type: 'completed', read: true })
@@ -87,10 +164,11 @@ export default function KitchenPage() {
     if (error) {
       console.error('Errore completamento notifica cucina', error);
       setErrorMessage('Impossibile segnare l’ordine come completato.');
+      await loadNotifications(false);
       return;
     }
 
-    await loadNotifications();
+    scheduleSilentRefresh();
   };
 
   const clearCompleted = async () => {
@@ -99,7 +177,9 @@ export default function KitchenPage() {
     setClearing(true);
     setErrorMessage(null);
 
-    const { data, error } = await supabase.rpc('clear_kitchen_completed_notifications');
+    const { data, error } = await supabase.rpc(
+      'clear_kitchen_completed_notifications'
+    );
 
     console.log('RPC clear kitchen result:', data);
 
@@ -110,7 +190,8 @@ export default function KitchenPage() {
       return;
     }
 
-    await loadNotifications();
+    setNotifications((prev) => prev.filter((n) => n.type !== 'completed'));
+    await loadNotifications(false);
     setClearing(false);
   };
 
@@ -125,7 +206,7 @@ export default function KitchenPage() {
         </div>
 
         <div style={styles.topActions}>
-          <button onClick={loadNotifications} style={styles.secondaryButton}>
+          <button onClick={() => loadNotifications()} style={styles.secondaryButton}>
             🔄 Aggiorna
           </button>
           <button onClick={() => router.push('/')} style={styles.secondaryButton}>
@@ -253,7 +334,7 @@ const styles: Record<string, React.CSSProperties> = {
   errorBox: {
     marginBottom: 16,
     background: '#fef2f2',
-    border: '1px solid #fecaca',
+    border: '1px solid '#fecaca',
     color: '#991b1b',
     borderRadius: 12,
     padding: 12,
