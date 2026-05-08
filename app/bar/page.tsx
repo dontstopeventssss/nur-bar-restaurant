@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 
@@ -24,9 +24,18 @@ export default function BarPage() {
   const [loading, setLoading] = useState(true);
   const [clearing, setClearing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const loadNotifications = useCallback(async () => {
-    setLoading(true);
+  const sortNotifications = useCallback((rows: NotificationRow[]) => {
+    return [...rows].sort((a, b) => {
+      const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return aTime - bTime;
+    });
+  }, []);
+
+  const loadNotifications = useCallback(async (showLoader = true) => {
+    if (showLoader) setLoading(true);
     setErrorMessage(null);
 
     const { data, error } = await supabase
@@ -40,11 +49,21 @@ export default function BarPage() {
       setErrorMessage('Errore nel caricamento notifiche bar.');
       setNotifications([]);
     } else {
-      setNotifications((data as NotificationRow[]) ?? []);
+      setNotifications(sortNotifications((data as NotificationRow[]) ?? []));
     }
 
-    setLoading(false);
-  }, []);
+    if (showLoader) setLoading(false);
+  }, [sortNotifications]);
+
+  const scheduleSilentRefresh = useCallback(() => {
+    if (refreshTimeoutRef.current) {
+      clearTimeout(refreshTimeoutRef.current);
+    }
+
+    refreshTimeoutRef.current = setTimeout(() => {
+      loadNotifications(false);
+    }, 700);
+  }, [loadNotifications]);
 
   useEffect(() => {
     loadNotifications();
@@ -53,17 +72,70 @@ export default function BarPage() {
       .channel('bar-notifications-realtime')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'notifications' },
-        () => {
-          loadNotifications();
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: 'target_role=eq.bar',
+        },
+        (payload) => {
+          const newRow = payload.new as NotificationRow;
+
+          setNotifications((prev) => {
+            const alreadyExists = prev.some((n) => n.id === newRow.id);
+            if (alreadyExists) return prev;
+            return sortNotifications([...prev, newRow]);
+          });
+
+          scheduleSilentRefresh();
         }
       )
-      .subscribe();
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'notifications',
+          filter: 'target_role=eq.bar',
+        },
+        (payload) => {
+          const updatedRow = payload.new as NotificationRow;
+
+          setNotifications((prev) =>
+            sortNotifications(
+              prev.map((n) => (n.id === updatedRow.id ? updatedRow : n))
+            )
+          );
+
+          scheduleSilentRefresh();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'notifications',
+          filter: 'target_role=eq.bar',
+        },
+        (payload) => {
+          const oldRow = payload.old as NotificationRow;
+
+          setNotifications((prev) => prev.filter((n) => n.id !== oldRow.id));
+          scheduleSilentRefresh();
+        }
+      )
+      .subscribe((status) => {
+        console.log('Bar realtime status:', status);
+      });
 
     return () => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
       supabase.removeChannel(channel);
     };
-  }, [loadNotifications]);
+  }, [loadNotifications, scheduleSilentRefresh, sortNotifications]);
 
   const pendingOrders = useMemo(
     () => notifications.filter((n) => n.type !== 'completed'),
@@ -78,6 +150,12 @@ export default function BarPage() {
   const markAsCompleted = async (id: string) => {
     setErrorMessage(null);
 
+    setNotifications((prev) =>
+      prev.map((n) =>
+        n.id === id ? { ...n, type: 'completed', read: true } : n
+      )
+    );
+
     const { error } = await supabase
       .from('notifications')
       .update({ type: 'completed', read: true })
@@ -87,10 +165,11 @@ export default function BarPage() {
     if (error) {
       console.error('Errore completamento notifica bar', error);
       setErrorMessage('Impossibile segnare l’ordine come completato.');
+      await loadNotifications(false);
       return;
     }
 
-    await loadNotifications();
+    scheduleSilentRefresh();
   };
 
   const clearCompleted = async () => {
@@ -110,7 +189,8 @@ export default function BarPage() {
       return;
     }
 
-    await loadNotifications();
+    setNotifications((prev) => prev.filter((n) => n.type !== 'completed'));
+    await loadNotifications(false);
     setClearing(false);
   };
 
@@ -124,7 +204,7 @@ export default function BarPage() {
           </p>
         </div>
         <div style={styles.topActions}>
-          <button onClick={loadNotifications} style={styles.secondaryButton}>
+          <button onClick={() => loadNotifications()} style={styles.secondaryButton}>
             🔄 Aggiorna
           </button>
           <button onClick={() => router.push('/')} style={styles.secondaryButton}>
@@ -139,7 +219,6 @@ export default function BarPage() {
         <div style={styles.card}>Caricamento ordini bar…</div>
       ) : (
         <div style={styles.layout}>
-          {/* CODA ORDINI */}
           <section style={styles.section}>
             <div style={styles.headerYellow}>
               📋 Coda ordini ({pendingOrders.length})
@@ -174,7 +253,6 @@ export default function BarPage() {
             )}
           </section>
 
-          {/* STORICO COMPLETATI */}
           <section style={styles.section}>
             <div style={styles.headerGreen}>
               <span>✅ Completati ({completedOrders.length})</span>
