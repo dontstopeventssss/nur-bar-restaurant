@@ -301,7 +301,7 @@ export default function TableOrderPage() {
         const existingRow = existingRows?.[0] as OrderItem | undefined;
 
         if (existingRow) {
-          await supabase
+          const { error: updateError } = await supabase
             .from('order_items')
             .update({
               quantity: finalQty,
@@ -311,16 +311,20 @@ export default function TableOrderPage() {
             })
             .eq('id', existingRow.id);
 
-          setOrderItems((prev) => ({
-            ...prev,
-            [menuItemId]: {
-              ...existingRow,
-              quantity: finalQty,
-              price: item.price,
-              item_name: item.name,
-              is_fuori_menu: item.is_fuori_menu ?? false,
-            },
-          }));
+          if (updateError) {
+            console.error('Errore aggiornamento order_item', updateError);
+          } else {
+            setOrderItems((prev) => ({
+              ...prev,
+              [menuItemId]: {
+                ...existingRow,
+                quantity: finalQty,
+                price: item.price,
+                item_name: item.name,
+                is_fuori_menu: item.is_fuori_menu ?? false,
+              },
+            }));
+          }
         } else {
           const { data: newRow, error: insertError } = await supabase
             .from('order_items')
