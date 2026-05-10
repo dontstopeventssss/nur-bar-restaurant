@@ -334,7 +334,7 @@ const styles: Record<string, React.CSSProperties> = {
   errorBox: {
     marginBottom: 16,
     background: '#fef2f2',
-    border: '1px solid '#fecaca',
+    border: '1px solid #fecaca',
     color: '#991b1b',
     borderRadius: 12,
     padding: 12,
