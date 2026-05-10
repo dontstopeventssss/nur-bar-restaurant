@@ -37,6 +37,7 @@ type MenuItem = {
   price: number;
   destination: string | null;
   is_fuori_menu?: boolean;
+  description?: string | null;
 };
 
 type OrderItem = {
@@ -70,12 +71,14 @@ export default function TableOrderPage() {
   const [pendingItems, setPendingItems] = useState<Record<string, number>>({});
   const [productSearch, setProductSearch] = useState('');
   const [showCreateProduct, setShowCreateProduct] = useState(false);
+  const [openDescriptionId, setOpenDescriptionId] = useState<string | null>(null);
 
   const [newProductName, setNewProductName] = useState('');
   const [newProductPrice, setNewProductPrice] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newProductDestination, setNewProductDestination] = useState<'bar' | 'kitchen'>('bar');
+  const [newProductDescription, setNewProductDescription] = useState('');
 
   useEffect(() => {
     const loadData = async () => {
@@ -131,7 +134,7 @@ export default function TableOrderPage() {
 
         const { data: itemsData, error: itemsError } = await supabase
           .from('menu_items')
-          .select('id, category_id, name, price, destination, is_fuori_menu')
+          .select('id, category_id, name, price, destination, is_fuori_menu, description')
           .order('name', { ascending: true });
 
         if (itemsError) {
@@ -416,6 +419,7 @@ export default function TableOrderPage() {
     const name = newProductName.trim();
     const price = Number(newProductPrice.replace(',', '.'));
     const categoryName = newCategoryName.trim();
+    const description = newProductDescription.trim();
 
     if (!name) {
       alert('Inserisci il nome del prodotto.');
@@ -466,6 +470,7 @@ export default function TableOrderPage() {
           price,
           destination: newProductDestination,
           is_fuori_menu: true,
+          description: description || null,
         })
         .select()
         .single();
@@ -485,6 +490,7 @@ export default function TableOrderPage() {
       setNewProductPrice('');
       setNewCategoryName('');
       setNewProductDestination('bar');
+      setNewProductDescription('');
       setShowCreateProduct(false);
 
       handleChangeQuantity(item, 1);
@@ -783,6 +789,16 @@ export default function TableOrderPage() {
                 <option value="kitchen">Cucina</option>
               </select>
             </div>
+
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={labelStyle}>Descrizione / ingredienti</label>
+              <textarea
+                value={newProductDescription}
+                onChange={(e) => setNewProductDescription(e.target.value)}
+                placeholder="Es. Gin, tonica premium, lime"
+                style={textareaStyle}
+              />
+            </div>
           </div>
 
           <div style={{ marginTop: 12 }}>
@@ -844,6 +860,8 @@ export default function TableOrderPage() {
                   const oi = orderItems[item.id];
                   const qty = oi ? oi.quantity : 0;
                   const pendingQty = pendingItems[item.id] ?? 0;
+                  const hasDescription = Boolean(item.description?.trim());
+                  const isDescriptionOpen = openDescriptionId === item.id;
 
                   return (
                     <div
@@ -851,105 +869,181 @@ export default function TableOrderPage() {
                       style={{
                         padding: '8px 10px',
                         display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
+                        flexDirection: 'column',
                         borderTop: '1px solid #eee',
-                        gap: 12,
+                        gap: 8,
                         color: '#111',
                         backgroundColor: pendingQty > 0 ? '#fffbeb' : 'white',
                       }}
                     >
-                      <div>
-                        <div style={{ fontSize: 14, fontWeight: 500, color: '#111' }}>
-                          {item.name}
-                          {item.is_fuori_menu && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          gap: 12,
+                        }}
+                      >
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              flexWrap: 'wrap',
+                            }}
+                          >
+                            <div style={{ fontSize: 14, fontWeight: 500, color: '#111' }}>
+                              {item.name}
+                            </div>
+
+                            {item.is_fuori_menu && (
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  padding: '2px 6px',
+                                  borderRadius: 999,
+                                  backgroundColor: '#fee2e2',
+                                  color: '#991b1b',
+                                }}
+                              >
+                                FUORI MENÙ
+                              </span>
+                            )}
+
+                            {hasDescription && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setOpenDescriptionId((prev) =>
+                                    prev === item.id ? null : item.id
+                                  )
+                                }
+                                style={{
+                                  border: '1px solid #cbd5e1',
+                                  backgroundColor: isDescriptionOpen ? '#e2e8f0' : '#fff',
+                                  color: '#111',
+                                  borderRadius: 999,
+                                  width: 24,
+                                  height: 24,
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  lineHeight: 1,
+                                }}
+                                title="Mostra ingredienti"
+                              >
+                                i
+                              </button>
+                            )}
+                          </div>
+
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              flexWrap: 'wrap',
+                              marginTop: 2,
+                            }}
+                          >
+                            <span style={{ fontSize: 10, color: '#888', fontWeight: 500 }}>
+                              {item.destination === 'kitchen' ? '🍽️ cucina' : '🍹 bar'}
+                            </span>
+
+                            {pendingQty > 0 && (
+                              <span
+                                style={{
+                                  display: 'inline-block',
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  padding: '2px 6px',
+                                  borderRadius: 4,
+                                  backgroundColor: '#fef3c7',
+                                  color: '#92400e',
+                                }}
+                              >
+                                +{pendingQty} da inviare
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            flexWrap: 'wrap',
+                            justifyContent: 'flex-end',
+                          }}
+                        >
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#111' }}>
+                            € {item.price.toFixed(2)}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteOrderItem(item.id)}
+                            disabled={!oi}
+                            style={{
+                              ...trashBtnStyle,
+                              opacity: oi ? 1 : 0.4,
+                              cursor: oi ? 'pointer' : 'not-allowed',
+                            }}
+                            title="Rimuovi del tutto il prodotto dall'ordine"
+                          >
+                            🗑️
+                          </button>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <button
+                              type="button"
+                              onClick={() => handleChangeQuantity(item, -1)}
+                              style={qtyBtnStyle}
+                            >
+                              −
+                            </button>
+
                             <span
                               style={{
-                                marginLeft: 8,
-                                fontSize: 10,
-                                fontWeight: 700,
-                                padding: '2px 6px',
-                                borderRadius: 999,
-                                backgroundColor: '#fee2e2',
-                                color: '#991b1b',
+                                width: 24,
+                                textAlign: 'center',
+                                fontSize: 13,
+                                fontWeight: qty > 0 ? 700 : 400,
+                                color: qty > 0 ? '#111' : '#999',
                               }}
                             >
-                              FUORI MENÙ
+                              {qty}
                             </span>
-                          )}
+
+                            <button
+                              type="button"
+                              onClick={() => handleChangeQuantity(item, 1)}
+                              style={qtyBtnStyle}
+                            >
+                              +
+                            </button>
+                          </div>
                         </div>
-
-                        <span style={{ fontSize: 10, color: '#888', fontWeight: 500 }}>
-                          {item.destination === 'kitchen' ? '🍽️ cucina' : '🍹 bar'}
-                        </span>
-
-                        {pendingQty > 0 && (
-                          <span
-                            style={{
-                              display: 'inline-block',
-                              marginLeft: 6,
-                              fontSize: 10,
-                              fontWeight: 700,
-                              padding: '2px 6px',
-                              borderRadius: 4,
-                              backgroundColor: '#fef3c7',
-                              color: '#92400e',
-                            }}
-                          >
-                            +{pendingQty} da inviare
-                          </span>
-                        )}
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#111' }}>
-                          € {item.price.toFixed(2)}
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteOrderItem(item.id)}
-                          disabled={!oi}
+                      {hasDescription && isDescriptionOpen && (
+                        <div
                           style={{
-                            ...trashBtnStyle,
-                            opacity: oi ? 1 : 0.4,
-                            cursor: oi ? 'pointer' : 'not-allowed',
+                            backgroundColor: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: 8,
+                            padding: '8px 10px',
+                            fontSize: 12,
+                            color: '#334155',
+                            lineHeight: 1.45,
                           }}
-                          title="Rimuovi del tutto il prodotto dall'ordine"
                         >
-                          🗑️
-                        </button>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <button
-                            type="button"
-                            onClick={() => handleChangeQuantity(item, -1)}
-                            style={qtyBtnStyle}
-                          >
-                            −
-                          </button>
-
-                          <span
-                            style={{
-                              width: 24,
-                              textAlign: 'center',
-                              fontSize: 13,
-                              fontWeight: qty > 0 ? 700 : 400,
-                              color: qty > 0 ? '#111' : '#999',
-                            }}
-                          >
-                            {qty}
-                          </span>
-
-                          <button
-                            type="button"
-                            onClick={() => handleChangeQuantity(item, 1)}
-                            style={qtyBtnStyle}
-                          >
-                            +
-                          </button>
+                          {item.description}
                         </div>
-                      </div>
+                      )}
                     </div>
                   );
                 })}
@@ -998,4 +1092,18 @@ const inputStyle: React.CSSProperties = {
   fontSize: 14,
   color: '#111',
   backgroundColor: '#fff',
+};
+
+const textareaStyle: React.CSSProperties = {
+  width: '100%',
+  minHeight: 80,
+  resize: 'vertical',
+  padding: '8px 10px',
+  border: '1px solid #ccc',
+  borderRadius: 6,
+  fontSize: 14,
+  color: '#111',
+  backgroundColor: '#fff',
+  fontFamily: 'inherit',
+  lineHeight: 1.4,
 };
