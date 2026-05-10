@@ -23,6 +23,7 @@ type MenuItem = {
   price: number;
   destination: Destination | null;
   is_fuori_menu?: boolean;
+  description?: string | null;
 };
 
 type OrderRow = {
@@ -85,12 +86,14 @@ export default function OwnerPage() {
   const [newProductCategoryId, setNewProductCategoryId] = useState('');
   const [newProductDestination, setNewProductDestination] =
     useState<Destination>('bar');
+  const [newProductDescription, setNewProductDescription] = useState('');
 
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editPrice, setEditPrice] = useState('');
   const [editCategoryId, setEditCategoryId] = useState('');
   const [editDestination, setEditDestination] = useState<Destination>('bar');
+  const [editDescription, setEditDescription] = useState('');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -396,6 +399,7 @@ export default function OwnerPage() {
     const name = newProductName.trim();
     const price = Number(newProductPrice.replace(',', '.'));
     const categoryId = newProductCategoryId;
+    const description = newProductDescription.trim();
 
     if (!name) {
       alert('Inserisci il nome del prodotto.');
@@ -420,6 +424,7 @@ export default function OwnerPage() {
           category_id: categoryId,
           destination: newProductDestination,
           is_fuori_menu: false,
+          description: description || null,
         })
         .select()
         .single();
@@ -438,6 +443,7 @@ export default function OwnerPage() {
       setNewProductName('');
       setNewProductPrice('');
       setNewProductDestination('bar');
+      setNewProductDescription('');
       await loadData();
     } finally {
       setSaving(false);
@@ -450,6 +456,7 @@ export default function OwnerPage() {
     setEditPrice(String(item.price));
     setEditCategoryId(item.category_id);
     setEditDestination(item.destination ?? 'bar');
+    setEditDescription(item.description ?? '');
   };
 
   const cancelEditItem = () => {
@@ -458,6 +465,7 @@ export default function OwnerPage() {
     setEditPrice('');
     setEditCategoryId('');
     setEditDestination('bar');
+    setEditDescription('');
   };
 
   const handleSaveItem = async () => {
@@ -466,6 +474,7 @@ export default function OwnerPage() {
     const name = editName.trim();
     const price = Number(editPrice.replace(',', '.'));
     const categoryId = editCategoryId;
+    const description = editDescription.trim();
 
     if (!name) {
       alert('Inserisci il nome del prodotto.');
@@ -489,6 +498,7 @@ export default function OwnerPage() {
           price,
           category_id: categoryId,
           destination: editDestination,
+          description: description || null,
         })
         .eq('id', editingItemId)
         .select()
@@ -918,6 +928,16 @@ export default function OwnerPage() {
                     onChange={setNewProductDestination}
                   />
                 </div>
+
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={styles.label}>Descrizione / ingredienti</label>
+                  <textarea
+                    value={newProductDescription}
+                    onChange={(e) => setNewProductDescription(e.target.value)}
+                    placeholder="Es. Hamburger di manzo, cheddar, lattuga, pomodoro, salsa burger"
+                    style={styles.textarea}
+                  />
+                </div>
               </div>
 
               <div style={{ marginTop: 8 }}>
@@ -942,7 +962,7 @@ export default function OwnerPage() {
                 <div style={{ minWidth: 0 }}>
                   <h2 style={styles.sectionTitle}>Prodotti menu</h2>
                   <p style={styles.smallText}>
-                    Modifica nome, prezzo, categoria e destinazione.
+                    Modifica nome, prezzo, categoria, destinazione e descrizione.
                   </p>
                 </div>
 
@@ -973,13 +993,14 @@ export default function OwnerPage() {
                       <th style={styles.th}>Categoria</th>
                       <th style={styles.th}>Prezzo</th>
                       <th style={styles.th}>Dest.</th>
+                      <th style={styles.th}>Descrizione</th>
                       <th style={styles.th}>Azioni</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredItems.length === 0 ? (
                       <tr>
-                        <td style={styles.emptyTd} colSpan={5}>
+                        <td style={styles.emptyTd} colSpan={6}>
                           Nessun prodotto trovato.
                         </td>
                       </tr>
@@ -1086,6 +1107,23 @@ export default function OwnerPage() {
                                 >
                                   {item.destination === 'kitchen' ? 'CUCINA' : 'BAR'}
                                 </span>
+                              )}
+                            </td>
+
+                            <td style={styles.td}>
+                              {isEditing ? (
+                                <textarea
+                                  value={editDescription}
+                                  onChange={(e) => setEditDescription(e.target.value)}
+                                  placeholder="Descrizione / ingredienti"
+                                  style={styles.textareaSmall}
+                                />
+                              ) : item.description ? (
+                                <div style={styles.descriptionPreview}>
+                                  {item.description}
+                                </div>
+                              ) : (
+                                <span style={{ color: '#999', fontSize: 12 }}>—</span>
                               )}
                             </td>
 
@@ -1297,7 +1335,7 @@ export default function OwnerPage() {
 const styles: Record<string, React.CSSProperties> = {
   pageWrap: {
     padding: 10,
-    maxWidth: 920,
+    maxWidth: 1100,
     margin: '0 auto',
     backgroundColor: '#f5f5f5',
     minHeight: '100vh',
@@ -1400,6 +1438,39 @@ const styles: Record<string, React.CSSProperties> = {
     backgroundColor: '#fff',
     color: '#111',
     minHeight: 32,
+  },
+  textarea: {
+    width: '100%',
+    minHeight: 82,
+    resize: 'vertical',
+    padding: '8px 10px',
+    borderRadius: 6,
+    border: '1px solid #ccc',
+    fontSize: 13,
+    backgroundColor: '#fff',
+    color: '#111',
+    fontFamily: 'inherit',
+    lineHeight: 1.4,
+  },
+  textareaSmall: {
+    width: '100%',
+    minHeight: 70,
+    resize: 'vertical',
+    padding: '8px 10px',
+    borderRadius: 6,
+    border: '1px solid #ccc',
+    fontSize: 12,
+    backgroundColor: '#fff',
+    color: '#111',
+    fontFamily: 'inherit',
+    lineHeight: 1.4,
+  },
+  descriptionPreview: {
+    maxWidth: 260,
+    fontSize: 12,
+    color: '#444',
+    lineHeight: 1.35,
+    whiteSpace: 'normal',
   },
   label: {
     display: 'block',
@@ -1599,7 +1670,7 @@ const styles: Record<string, React.CSSProperties> = {
   td: {
     padding: '7px 5px',
     borderBottom: '1px solid #eee',
-    verticalAlign: 'middle',
+    verticalAlign: 'top',
     fontSize: 12,
     color: '#111',
   },
