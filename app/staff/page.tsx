@@ -34,7 +34,7 @@ const FLOOR_OFFSET_Y = -9;
 const CLIP_TOP = 31;
 const CLIP_RIGHT = 15;
 const CLIP_BOTTOM = 23;
-const CLIP_LEFT = 12;
+const CLIP_LEFT = 10;
 
 export default function StaffPage() {
   const router = useRouter();
