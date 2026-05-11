@@ -37,7 +37,7 @@ export default function StaffPage() {
   const [isMobile, setIsMobile] = useState(false);
   const [showMap, setShowMap] = useState(true);
 
-  const [floorRotation, setFloorRotation] = useState(-25);
+  const [floorRotation, setFloorRotation] = useState(-44);
   const [floorScale, setFloorScale] = useState(0.9);
   const [floorOffsetX, setFloorOffsetX] = useState(-33);
   const [floorOffsetY, setFloorOffsetY] = useState(-9);
