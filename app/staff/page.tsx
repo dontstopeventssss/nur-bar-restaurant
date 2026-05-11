@@ -34,7 +34,7 @@ const FLOOR_OFFSET_Y = -9;
 const CLIP_TOP = 31;
 const CLIP_RIGHT = 15;
 const CLIP_BOTTOM = 23;
-const CLIP_LEFT = 6;
+const CLIP_LEFT = 8;
 
 export default function StaffPage() {
   const router = useRouter();
@@ -428,6 +428,7 @@ export default function StaffPage() {
                   width: '100%',
                   maxWidth: isMobile ? '100%' : 1840,
                   aspectRatio: `${MAP_WIDTH} / ${MAP_HEIGHT}`,
+                  minHeight: isMobile ? '72vw' : undefined,
                   margin: '0 auto',
                   overflow: 'hidden',
                   borderRadius: 12,
@@ -482,10 +483,10 @@ export default function StaffPage() {
                         top: `${(table.y / MAP_HEIGHT) * 100}%`,
                         width: `${(TABLE_WIDTH / MAP_WIDTH) * 100}%`,
                         height: `${(TABLE_HEIGHT / MAP_HEIGHT) * 100}%`,
-                        minWidth: 35,
-                        minHeight: 35,
-                        maxWidth: 44,
-                        maxHeight: 44,
+                        minWidth: isMobile ? 24 : 35,
+                        minHeight: isMobile ? 24 : 35,
+                        maxWidth: isMobile ? 30 : 44,
+                        maxHeight: isMobile ? 30 : 44,
                         borderRadius: 6,
                         border: `2px solid ${colors.border}`,
                         background: colors.bg,
@@ -512,7 +513,7 @@ export default function StaffPage() {
                           whiteSpace: 'nowrap',
                           textOverflow: 'ellipsis',
                           fontWeight: 800,
-                          fontSize: 7,
+                          fontSize: isMobile ? 6 : 7,
                           lineHeight: 1,
                           textAlign: 'center',
                         }}
