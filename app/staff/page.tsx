@@ -22,9 +22,10 @@ type TableRow = {
 const GRID_SIZE = 20;
 const MAP_WIDTH = 980;
 const MAP_HEIGHT = 620;
-const TABLE_WIDTH = 62;
-const TABLE_HEIGHT = 62;
+const TABLE_WIDTH = 42;
+const TABLE_HEIGHT = 42;
 const DRAG_THRESHOLD = 8;
+const FLOOR_ROTATION_DEG = -8;
 
 export default function StaffPage() {
   const router = useRouter();
@@ -324,26 +325,23 @@ export default function StaffPage() {
         minHeight: '100vh',
         background: '#f5f5f5',
         color: '#111',
-        padding: isMobile ? 8 : 12,
+        padding: isMobile ? 6 : 10,
       }}
     >
       <div
         style={{
-          maxWidth: 1450,
+          maxWidth: 1500,
           margin: '0 auto',
           display: 'grid',
-          gridTemplateColumns: isMobile
-            ? '1fr'
-            : 'minmax(0, 1.35fr) minmax(320px, 0.65fr)',
-          gap: 12,
+          gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) 320px',
+          gap: isMobile ? 8 : 10,
         }}
       >
         <section
           style={{
             background: '#fff',
-            border: '1px solid #ddd',
-            borderRadius: 14,
-            padding: isMobile ? 8 : 12,
+            borderRadius: 12,
+            padding: isMobile ? 6 : 8,
             overflow: 'hidden',
             order: 1,
           }}
@@ -353,16 +351,16 @@ export default function StaffPage() {
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'flex-start',
-              gap: 10,
+              gap: 8,
               flexWrap: 'wrap',
-              marginBottom: 12,
+              marginBottom: 8,
             }}
           >
             <div>
               <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 24 }}>
                 Gestione tavoli
               </h1>
-              <p style={{ margin: '4px 0 0 0', fontSize: 13, color: '#666' }}>
+              <p style={{ margin: '4px 0 0 0', fontSize: 12, color: '#666' }}>
                 Tocca un tavolo per aprire l’ordine, trascinalo per spostarlo.
               </p>
             </div>
@@ -409,10 +407,7 @@ export default function StaffPage() {
               position: 'relative',
               width: '100%',
               overflow: 'auto',
-              borderRadius: 12,
-              border: '1px solid #cbd5e1',
-              background: '#f8fafc',
-              minHeight: isMobile ? 420 : 640,
+              minHeight: isMobile ? 360 : 620,
             }}
           >
             <div
@@ -420,7 +415,8 @@ export default function StaffPage() {
                 position: 'relative',
                 width: MAP_WIDTH,
                 height: MAP_HEIGHT,
-                background: '#ffffff',
+                margin: 0,
+                background: '#fff',
               }}
             >
               <img
@@ -433,6 +429,8 @@ export default function StaffPage() {
                   width: '100%',
                   height: '100%',
                   objectFit: 'contain',
+                  transform: `rotate(${FLOOR_ROTATION_DEG}deg) scale(0.9)`,
+                  transformOrigin: 'center center',
                   pointerEvents: 'none',
                   zIndex: 1,
                 }}
@@ -443,8 +441,8 @@ export default function StaffPage() {
                   position: 'absolute',
                   inset: 0,
                   backgroundImage: `
-                    linear-gradient(to right, rgba(100,116,139,0.08) 1px, transparent 1px),
-                    linear-gradient(to bottom, rgba(100,116,139,0.08) 1px, transparent 1px)
+                    linear-gradient(to right, rgba(100,116,139,0.07) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(100,116,139,0.07) 1px, transparent 1px)
                   `,
                   backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
                   pointerEvents: 'none',
@@ -469,22 +467,23 @@ export default function StaffPage() {
                       top: table.y,
                       width: TABLE_WIDTH,
                       height: TABLE_HEIGHT,
-                      borderRadius: 8,
-                      border: `3px solid ${colors.border}`,
+                      borderRadius: 6,
+                      border: `2px solid ${colors.border}`,
                       background: colors.bg,
                       color: colors.text,
                       fontWeight: 800,
-                      fontSize: 12,
+                      fontSize: 9,
+                      lineHeight: 1.1,
                       cursor: 'grab',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       textAlign: 'center',
-                      boxShadow: '0 4px 10px rgba(0,0,0,0.12)',
                       userSelect: 'none',
                       touchAction: 'none',
-                      padding: 4,
+                      padding: 2,
                       zIndex: 3,
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.10)',
                     }}
                     title={`${table.name} - ${table.status}`}
                   >
@@ -500,18 +499,16 @@ export default function StaffPage() {
           <aside
             style={{
               background: '#fff',
-              border: '1px solid #ddd',
-              borderRadius: 14,
-              padding: isMobile ? 8 : 12,
+              borderRadius: 12,
+              padding: isMobile ? 8 : 10,
               display: 'flex',
               flexDirection: 'column',
-              gap: 12,
+              gap: 10,
               order: 2,
             }}
           >
             <section
               style={{
-                border: '1px solid #e5e7eb',
                 borderRadius: 12,
                 padding: 10,
                 background: '#fafafa',
@@ -556,7 +553,6 @@ export default function StaffPage() {
 
             <section
               style={{
-                border: '1px solid #e5e7eb',
                 borderRadius: 12,
                 padding: 10,
                 background: '#fafafa',
@@ -580,7 +576,6 @@ export default function StaffPage() {
 
             <section
               style={{
-                border: '1px solid #e5e7eb',
                 borderRadius: 12,
                 padding: 10,
                 background: '#fafafa',
@@ -684,7 +679,6 @@ export default function StaffPage() {
                             gap: 8,
                             padding: 8,
                             borderRadius: 10,
-                            border: '1px solid #ddd',
                             background: '#fff',
                           }}
                         >
@@ -747,7 +741,6 @@ export default function StaffPage() {
                       padding: 12,
                       borderRadius: 10,
                       background: '#fff',
-                      border: '1px dashed #ccc',
                       color: '#666',
                       fontSize: 13,
                     }}
