@@ -219,10 +219,12 @@ export default function TableOrderPage() {
 
   const categoriesWithItems = useMemo(
     () =>
-      categories.map((cat) => ({
-        ...cat,
-        items: filteredMenuItems.filter((item) => item.category_id === cat.id),
-      })),
+      categories
+        .map((cat) => ({
+          ...cat,
+          items: filteredMenuItems.filter((item) => item.category_id === cat.id),
+        }))
+        .filter((cat) => cat.items.length > 0),
     [categories, filteredMenuItems]
   );
 
@@ -466,39 +468,39 @@ export default function TableOrderPage() {
     }
   };
 
-const handleDeleteOrderItem = async (menuItemId: string) => {
-  const existing = orderItems[menuItemId];
-  if (!existing) return;
+  const handleDeleteOrderItem = async (menuItemId: string) => {
+    const existing = orderItems[menuItemId];
+    if (!existing) return;
 
-  setPendingItems((prev) => {
-    const copy = { ...prev };
-    delete copy[menuItemId];
-    return copy;
-  });
+    setPendingItems((prev) => {
+      const copy = { ...prev };
+      delete copy[menuItemId];
+      return copy;
+    });
 
-  if (existing.id) {
-    setSaving(true);
-    try {
-      const { error } = await supabase
-        .from('order_items')
-        .delete()
-        .eq('id', existing.id);
+    if (existing.id) {
+      setSaving(true);
+      try {
+        const { error } = await supabase
+          .from('order_items')
+          .delete()
+          .eq('id', existing.id);
 
-      if (error) {
-        console.error('Errore eliminazione order_item', error);
-        return;
+        if (error) {
+          console.error('Errore eliminazione order_item', error);
+          return;
+        }
+      } finally {
+        setSaving(false);
       }
-    } finally {
-      setSaving(false);
     }
-  }
 
-  setOrderItems((prev) => {
-    const copy = { ...prev };
-    delete copy[menuItemId];
-    return copy;
-  });
-};
+    setOrderItems((prev) => {
+      const copy = { ...prev };
+      delete copy[menuItemId];
+      return copy;
+    });
+  };
 
   const handleCreateProduct = async () => {
     const name = newProductName.trim();
@@ -1025,36 +1027,45 @@ const handleDeleteOrderItem = async (menuItemId: string) => {
       )}
 
       <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {categoriesWithItems.map((category) => {
-          const categoryColor = category.color || DEFAULT_CATEGORY_COLOR;
+        {categoriesWithItems.length === 0 ? (
+          <div
+            style={{
+              border: `1px solid ${UI.border}`,
+              borderRadius: 8,
+              padding: 12,
+              backgroundColor: UI.surface,
+              fontSize: 13,
+              color: UI.textSoft,
+            }}
+          >
+            Nessun prodotto trovato.
+          </div>
+        ) : (
+          categoriesWithItems.map((category) => {
+            const categoryColor = category.color || DEFAULT_CATEGORY_COLOR;
 
-          return (
-            <div
-              key={category.id}
-              style={{
-                border: `1px solid ${UI.border}`,
-                borderRadius: 8,
-                overflow: 'hidden',
-                backgroundColor: UI.surface,
-              }}
-            >
+            return (
               <div
+                key={category.id}
                 style={{
-                  padding: '6px 10px',
-                  backgroundColor: categoryColor,
-                  fontWeight: 600,
-                  fontSize: 14,
-                  color: UI.text,
+                  border: `1px solid ${UI.border}`,
+                  borderRadius: 8,
+                  overflow: 'hidden',
+                  backgroundColor: UI.surface,
                 }}
               >
-                {category.name}
-              </div>
-
-              {category.items.length === 0 ? (
-                <div style={{ padding: 8, fontSize: 12, color: UI.textSoft }}>
-                  Nessun prodotto trovato in questa categoria.
+                <div
+                  style={{
+                    padding: '6px 10px',
+                    backgroundColor: categoryColor,
+                    fontWeight: 600,
+                    fontSize: 14,
+                    color: UI.text,
+                  }}
+                >
+                  {category.name}
                 </div>
-              ) : (
+
                 <div>
                   {category.items.map((item) => {
                     const oi = orderItems[item.id];
@@ -1256,10 +1267,10 @@ const handleDeleteOrderItem = async (menuItemId: string) => {
                     );
                   })}
                 </div>
-              )}
-            </div>
-          );
-        })}
+              </div>
+            );
+          })
+        )}
       </section>
     </main>
   );
