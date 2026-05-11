@@ -347,7 +347,7 @@ export default function StaffPage() {
         minHeight: '100vh',
         background: '#f5f5f5',
         color: '#111',
-        padding: isMobile ? 2 : 6,
+        padding: isMobile ? 4 : 6,
       }}
     >
       <div
@@ -356,14 +356,14 @@ export default function StaffPage() {
           margin: '0 auto',
           display: 'flex',
           flexDirection: 'column',
-          gap: isMobile ? 8 : 10,
+          gap: 10,
         }}
       >
         <section
           style={{
             background: '#fff',
             borderRadius: 12,
-            padding: isMobile ? 2 : 6,
+            padding: isMobile ? 4 : 6,
           }}
         >
           <div
@@ -422,109 +422,218 @@ export default function StaffPage() {
 
           {showMap && (
             <div style={{ width: '100%' }}>
-              <div
-                style={{
-                  position: 'relative',
-                  width: '100%',
-                  maxWidth: isMobile ? '100%' : 1840,
-                  aspectRatio: isMobile ? 'auto' : `${MAP_WIDTH} / ${MAP_HEIGHT}`,
-                  height: isMobile ? 'clamp(320px, 62dvh, 560px)' : undefined,
-                  minHeight: isMobile ? 320 : undefined,
-                  margin: '0 auto',
-                  overflow: 'hidden',
-                  borderRadius: isMobile ? 10 : 12,
-                  background: '#ffffff',
-                }}
-              >
-                <img
-                  src="/piantina-nur.jpeg"
-                  alt="Piantina locale NUR"
-                  draggable={false}
-                  style={{
-                    position: 'absolute',
-                    inset: isMobile ? '-8%' : '-4%',
-                    width: isMobile ? '116%' : '108%',
-                    height: isMobile ? '116%' : '108%',
-                    objectFit: 'cover',
-                    transform: `translate(${FLOOR_OFFSET_X}px, ${FLOOR_OFFSET_Y}px) rotate(${FLOOR_ROTATION}deg) scale(${FLOOR_SCALE})`,
-                    transformOrigin: 'center center',
-                    pointerEvents: 'none',
-                    zIndex: 1,
-                  }}
-                />
-
+              {isMobile ? (
                 <div
                   style={{
-                    position: 'absolute',
-                    inset: 0,
-                    backgroundImage: `
-                      linear-gradient(to right, rgba(100,116,139,0.14) 1px, transparent 1px),
-                      linear-gradient(to bottom, rgba(100,116,139,0.14) 1px, transparent 1px)
-                    `,
-                    backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
-                    pointerEvents: 'none',
-                    zIndex: 2,
+                    width: '100%',
+                    overflow: 'auto',
+                    WebkitOverflowScrolling: 'touch',
+                    borderRadius: 12,
+                    background: '#fff',
+                    border: '1px solid #e5e7eb',
                   }}
-                />
-
-                {tables.map((table) => {
-                  const colors = getStatusColors(table.status);
-
-                  return (
-                    <button
-                      key={table.id}
-                      type="button"
-                      onPointerDown={(e) => handlePointerDown(e, table)}
-                      onPointerMove={(e) => handlePointerMove(e, table)}
-                      onPointerUp={(e) => handlePointerUp(e, table)}
-                      onPointerCancel={(e) => handlePointerCancel(e, table)}
+                >
+                  <div
+                    style={{
+                      position: 'relative',
+                      width: 980,
+                      height: 620,
+                      minWidth: 980,
+                      minHeight: 620,
+                      overflow: 'hidden',
+                      borderRadius: 12,
+                      background: '#ffffff',
+                    }}
+                  >
+                    <img
+                      src="/piantina-nur.jpeg"
+                      alt="Piantina locale NUR"
+                      draggable={false}
                       style={{
                         position: 'absolute',
-                        left: `${(table.x / MAP_WIDTH) * 100}%`,
-                        top: `${(table.y / MAP_HEIGHT) * 100}%`,
-                        width: `${(TABLE_WIDTH / MAP_WIDTH) * 100}%`,
-                        height: `${(TABLE_HEIGHT / MAP_HEIGHT) * 100}%`,
-                        minWidth: isMobile ? 20 : 35,
-                        minHeight: isMobile ? 20 : 35,
-                        maxWidth: isMobile ? 26 : 44,
-                        maxHeight: isMobile ? 26 : 44,
-                        borderRadius: isMobile ? 5 : 6,
-                        border: `2px solid ${colors.border}`,
-                        background: colors.bg,
-                        color: colors.text,
-                        cursor: 'grab',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        userSelect: 'none',
-                        touchAction: 'none',
-                        padding: 2,
-                        zIndex: 3,
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.10)',
-                        overflow: 'hidden',
+                        inset: '-4%',
+                        width: '108%',
+                        height: '108%',
+                        objectFit: 'cover',
+                        transform: `translate(${FLOOR_OFFSET_X}px, ${FLOOR_OFFSET_Y}px) rotate(${FLOOR_ROTATION}deg) scale(${FLOOR_SCALE})`,
+                        transformOrigin: 'center center',
+                        pointerEvents: 'none',
+                        zIndex: 1,
                       }}
-                      title={`${table.name} - ${table.status}`}
-                    >
-                      <span
+                    />
+
+                    <div
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        backgroundImage: `
+                          linear-gradient(to right, rgba(100,116,139,0.14) 1px, transparent 1px),
+                          linear-gradient(to bottom, rgba(100,116,139,0.14) 1px, transparent 1px)
+                        `,
+                        backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
+                        pointerEvents: 'none',
+                        zIndex: 2,
+                      }}
+                    />
+
+                    {tables.map((table) => {
+                      const colors = getStatusColors(table.status);
+
+                      return (
+                        <button
+                          key={table.id}
+                          type="button"
+                          onPointerDown={(e) => handlePointerDown(e, table)}
+                          onPointerMove={(e) => handlePointerMove(e, table)}
+                          onPointerUp={(e) => handlePointerUp(e, table)}
+                          onPointerCancel={(e) => handlePointerCancel(e, table)}
+                          style={{
+                            position: 'absolute',
+                            left: table.x,
+                            top: table.y,
+                            width: TABLE_WIDTH,
+                            height: TABLE_HEIGHT,
+                            borderRadius: 6,
+                            border: `2px solid ${colors.border}`,
+                            background: colors.bg,
+                            color: colors.text,
+                            cursor: 'grab',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            userSelect: 'none',
+                            touchAction: 'none',
+                            padding: 2,
+                            zIndex: 3,
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.10)',
+                            overflow: 'hidden',
+                          }}
+                          title={`${table.name} - ${table.status}`}
+                        >
+                          <span
+                            style={{
+                              display: 'block',
+                              width: '100%',
+                              maxWidth: '100%',
+                              overflow: 'hidden',
+                              whiteSpace: 'nowrap',
+                              textOverflow: 'ellipsis',
+                              fontWeight: 800,
+                              fontSize: 7,
+                              lineHeight: 1,
+                              textAlign: 'center',
+                            }}
+                          >
+                            {table.name}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    position: 'relative',
+                    width: '100%',
+                    maxWidth: 1840,
+                    aspectRatio: `${MAP_WIDTH} / ${MAP_HEIGHT}`,
+                    margin: '0 auto',
+                    overflow: 'hidden',
+                    borderRadius: 12,
+                    background: '#ffffff',
+                  }}
+                >
+                  <img
+                    src="/piantina-nur.jpeg"
+                    alt="Piantina locale NUR"
+                    draggable={false}
+                    style={{
+                      position: 'absolute',
+                      inset: '-4%',
+                      width: '108%',
+                      height: '108%',
+                      objectFit: 'cover',
+                      transform: `translate(${FLOOR_OFFSET_X}px, ${FLOOR_OFFSET_Y}px) rotate(${FLOOR_ROTATION}deg) scale(${FLOOR_SCALE})`,
+                      transformOrigin: 'center center',
+                      pointerEvents: 'none',
+                      zIndex: 1,
+                    }}
+                  />
+
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      backgroundImage: `
+                        linear-gradient(to right, rgba(100,116,139,0.14) 1px, transparent 1px),
+                        linear-gradient(to bottom, rgba(100,116,139,0.14) 1px, transparent 1px)
+                      `,
+                      backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
+                      pointerEvents: 'none',
+                      zIndex: 2,
+                    }}
+                  />
+
+                  {tables.map((table) => {
+                    const colors = getStatusColors(table.status);
+
+                    return (
+                      <button
+                        key={table.id}
+                        type="button"
+                        onPointerDown={(e) => handlePointerDown(e, table)}
+                        onPointerMove={(e) => handlePointerMove(e, table)}
+                        onPointerUp={(e) => handlePointerUp(e, table)}
+                        onPointerCancel={(e) => handlePointerCancel(e, table)}
                         style={{
-                          display: 'block',
-                          width: '100%',
-                          maxWidth: '100%',
+                          position: 'absolute',
+                          left: `${(table.x / MAP_WIDTH) * 100}%`,
+                          top: `${(table.y / MAP_HEIGHT) * 100}%`,
+                          width: `${(TABLE_WIDTH / MAP_WIDTH) * 100}%`,
+                          height: `${(TABLE_HEIGHT / MAP_HEIGHT) * 100}%`,
+                          minWidth: 35,
+                          minHeight: 35,
+                          maxWidth: 44,
+                          maxHeight: 44,
+                          borderRadius: 6,
+                          border: `2px solid ${colors.border}`,
+                          background: colors.bg,
+                          color: colors.text,
+                          cursor: 'grab',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          userSelect: 'none',
+                          touchAction: 'none',
+                          padding: 2,
+                          zIndex: 3,
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.10)',
                           overflow: 'hidden',
-                          whiteSpace: 'nowrap',
-                          textOverflow: 'ellipsis',
-                          fontWeight: 800,
-                          fontSize: isMobile ? 5 : 7,
-                          lineHeight: 1,
-                          textAlign: 'center',
                         }}
+                        title={`${table.name} - ${table.status}`}
                       >
-                        {table.name}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+                        <span
+                          style={{
+                            display: 'block',
+                            width: '100%',
+                            maxWidth: '100%',
+                            overflow: 'hidden',
+                            whiteSpace: 'nowrap',
+                            textOverflow: 'ellipsis',
+                            fontWeight: 800,
+                            fontSize: 7,
+                            lineHeight: 1,
+                            textAlign: 'center',
+                          }}
+                        >
+                          {table.name}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </section>
