@@ -14,6 +14,7 @@ type Destination = 'bar' | 'kitchen';
 type MenuCategory = {
   id: string;
   name: string;
+  color: string | null;
 };
 
 type MenuItem = {
@@ -53,6 +54,23 @@ type ReportRange = 'today' | 'week' | 'month' | 'all';
 const DEFAULT_OWNER_USERNAME = 'Franco';
 const DEFAULT_OWNER_PASSWORD = '0000';
 
+const CATEGORY_PRESET_COLORS = [
+  '#111111',
+  '#dc2626',
+  '#ea580c',
+  '#d97706',
+  '#65a30d',
+  '#059669',
+  '#0891b2',
+  '#2563eb',
+  '#7c3aed',
+  '#c026d3',
+  '#be123c',
+  '#6b4f3a',
+];
+
+const DEFAULT_CATEGORY_COLOR = '#111111';
+
 export default function OwnerPage() {
   const router = useRouter();
 
@@ -81,6 +99,8 @@ export default function OwnerPage() {
   const [reportRange, setReportRange] = useState<ReportRange>('all');
 
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryColor, setNewCategoryColor] = useState(DEFAULT_CATEGORY_COLOR);
+
   const [newProductName, setNewProductName] = useState('');
   const [newProductPrice, setNewProductPrice] = useState('');
   const [newProductCategoryId, setNewProductCategoryId] = useState('');
@@ -327,6 +347,8 @@ export default function OwnerPage() {
 
   const handleCreateCategory = async () => {
     const name = newCategoryName.trim();
+    const color = newCategoryColor.trim() || DEFAULT_CATEGORY_COLOR;
+
     if (!name) {
       alert('Inserisci il nome della categoria.');
       return;
@@ -336,7 +358,7 @@ export default function OwnerPage() {
     try {
       const { data, error } = await supabase
         .from('menu_categories')
-        .insert({ name })
+        .insert({ name, color })
         .select()
         .single();
 
@@ -353,6 +375,7 @@ export default function OwnerPage() {
 
       setCategories(updated);
       setNewCategoryName('');
+      setNewCategoryColor(DEFAULT_CATEGORY_COLOR);
       setNewProductCategoryId(created.id);
     } finally {
       setSaving(false);
@@ -815,6 +838,62 @@ export default function OwnerPage() {
                   onChange={(e) => setNewCategoryName(e.target.value)}
                   style={styles.input}
                 />
+
+                <div>
+                  <label style={styles.label}>Colore categoria</label>
+
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
+                      gap: 6,
+                    }}
+                  >
+                    {CATEGORY_PRESET_COLORS.map((color) => {
+                      const selected = newCategoryColor === color;
+
+                      return (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={() => setNewCategoryColor(color)}
+                          title={color}
+                          style={{
+                            height: 32,
+                            borderRadius: 8,
+                            border: selected ? '3px solid #111' : '1px solid #d1d5db',
+                            backgroundColor: color,
+                            cursor: 'pointer',
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: 8,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: 999,
+                        backgroundColor: newCategoryColor,
+                        border: '1px solid #ccc',
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span style={{ fontSize: 12, color: '#444' }}>
+                      {newCategoryColor}
+                    </span>
+                  </div>
+                </div>
+
                 <button
                   type="button"
                   onClick={handleCreateCategory}
@@ -832,8 +911,7 @@ export default function OwnerPage() {
                     ...styles.categoryLineButton,
                     backgroundColor:
                       selectedCategoryFilter === 'all' ? '#111' : '#fff',
-                    color:
-                      selectedCategoryFilter === 'all' ? '#fff' : '#111',
+                    color: selectedCategoryFilter === 'all' ? '#fff' : '#111',
                     borderColor:
                       selectedCategoryFilter === 'all' ? '#111' : '#ddd',
                   }}
@@ -846,6 +924,9 @@ export default function OwnerPage() {
                     (item) => item.category_id === category.id
                   ).length;
 
+                  const active = selectedCategoryFilter === category.id;
+                  const categoryColor = category.color || DEFAULT_CATEGORY_COLOR;
+
                   return (
                     <div key={category.id} style={styles.categoryRowSingle}>
                       <button
@@ -854,15 +935,33 @@ export default function OwnerPage() {
                         style={{
                           ...styles.categoryLineButton,
                           flex: 1,
-                          backgroundColor:
-                            selectedCategoryFilter === category.id ? '#111' : '#fff',
-                          color:
-                            selectedCategoryFilter === category.id ? '#fff' : '#111',
-                          borderColor:
-                            selectedCategoryFilter === category.id ? '#111' : '#ddd',
+                          backgroundColor: active ? categoryColor : '#fff',
+                          color: active ? '#fff' : '#111',
+                          borderColor: active ? categoryColor : '#ddd',
                         }}
                       >
-                        {category.name} ({count})
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            flexWrap: 'wrap',
+                          }}
+                        >
+                          <span
+                            style={{
+                              width: 10,
+                              height: 10,
+                              borderRadius: 999,
+                              backgroundColor: categoryColor,
+                              display: 'inline-block',
+                              border: '1px solid rgba(0,0,0,0.15)',
+                            }}
+                          />
+                          <span>
+                            {category.name} ({count})
+                          </span>
+                        </span>
                       </button>
 
                       <button
