@@ -28,6 +28,7 @@ type Order = {
 type MenuCategory = {
   id: string;
   name: string;
+  color?: string | null;
 };
 
 type MenuItem = {
@@ -84,6 +85,8 @@ const UI = {
   inputBg: '#ffffff',
   inputBorder: '#cccccc',
 };
+
+const DEFAULT_CATEGORY_COLOR = UI.surfaceMuted;
 
 export default function TableOrderPage() {
   const router = useRouter();
@@ -1005,7 +1008,7 @@ export default function TableOrderPage() {
                 fontWeight: 600,
               }}
             >
-              Salva prodotto e aggiungi all'ordine
+              Salva prodotto e aggiungi all&apos;ordine
             </button>
           </div>
         </section>
@@ -1022,290 +1025,16 @@ export default function TableOrderPage() {
       )}
 
       <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {categoriesWithItems.map((category) => (
-          <div
-            key={category.id}
-            style={{
-              border: `1px solid ${UI.border}`,
-              borderRadius: 8,
-              overflow: 'hidden',
-              backgroundColor: UI.surface,
-            }}
-          >
+        {categoriesWithItems.map((category) => {
+          const categoryColor = category.color || DEFAULT_CATEGORY_COLOR;
+
+          return (
             <div
+              key={category.id}
               style={{
-                padding: '6px 10px',
-                backgroundColor: UI.surfaceMuted,
-                fontWeight: 600,
-                fontSize: 14,
-                color: UI.text,
+                border: `1px solid ${UI.border}`,
+                borderRadius: 8,
+                overflow: 'hidden',
+                backgroundColor: UI.surface,
               }}
-            >
-              {category.name}
-            </div>
-
-            {category.items.length === 0 ? (
-              <div style={{ padding: 8, fontSize: 12, color: UI.textSoft }}>
-                Nessun prodotto trovato in questa categoria.
-              </div>
-            ) : (
-              <div>
-                {category.items.map((item) => {
-                  const oi = orderItems[item.id];
-                  const qty = oi ? oi.quantity : 0;
-                  const pendingQty = pendingItems[item.id] ?? 0;
-                  const hasDescription = Boolean(item.description?.trim());
-                  const isDescriptionOpen = openDescriptionId === item.id;
-
-                  return (
-                    <div
-                      key={item.id}
-                      style={{
-                        padding: '8px 10px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        borderTop: `1px solid ${UI.borderSoft}`,
-                        gap: 8,
-                        color: UI.text,
-                        backgroundColor: pendingQty > 0 ? UI.pendingBg : UI.surface,
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          gap: 12,
-                        }}
-                      >
-                        <div style={{ minWidth: 0, flex: 1 }}>
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 6,
-                              flexWrap: 'wrap',
-                            }}
-                          >
-                            <div style={{ fontSize: 14, fontWeight: 500, color: UI.text }}>
-                              {item.name}
-                            </div>
-
-                            {item.is_fuori_menu && (
-                              <span
-                                style={{
-                                  fontSize: 10,
-                                  fontWeight: 700,
-                                  padding: '2px 6px',
-                                  borderRadius: 999,
-                                  backgroundColor: UI.fuoriMenuBg,
-                                  color: UI.fuoriMenuText,
-                                }}
-                              >
-                                FUORI MENÙ
-                              </span>
-                            )}
-
-                            {hasDescription && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setOpenDescriptionId((prev) =>
-                                    prev === item.id ? null : item.id
-                                  )
-                                }
-                                style={{
-                                  border: `1px solid ${UI.inputBorder}`,
-                                  backgroundColor: isDescriptionOpen
-                                    ? UI.badgeInfoBg
-                                    : UI.surface,
-                                  color: UI.badgeInfoText,
-                                  borderRadius: 999,
-                                  width: 24,
-                                  height: 24,
-                                  fontSize: 12,
-                                  fontWeight: 700,
-                                  cursor: 'pointer',
-                                  lineHeight: 1,
-                                }}
-                                title="Mostra ingredienti"
-                              >
-                                i
-                              </button>
-                            )}
-                          </div>
-
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 6,
-                              flexWrap: 'wrap',
-                              marginTop: 2,
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: 10,
-                                color: UI.textSoft,
-                                fontWeight: 500,
-                              }}
-                            >
-                              {item.destination === 'kitchen' ? '🍽️ cucina' : '🍹 bar'}
-                            </span>
-
-                            {pendingQty > 0 && (
-                              <span
-                                style={{
-                                  display: 'inline-block',
-                                  fontSize: 10,
-                                  fontWeight: 700,
-                                  padding: '2px 6px',
-                                  borderRadius: 4,
-                                  backgroundColor: UI.pendingBg,
-                                  color: UI.pendingText,
-                                }}
-                              >
-                                +{pendingQty} da inviare
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 8,
-                            flexWrap: 'wrap',
-                            justifyContent: 'flex-end',
-                          }}
-                        >
-                          <div style={{ fontSize: 13, fontWeight: 600, color: UI.text }}>
-                            € {item.price.toFixed(2)}
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteOrderItem(item.id)}
-                            disabled={!oi}
-                            style={{
-                              ...trashBtnStyle,
-                              opacity: oi ? 1 : 0.4,
-                              cursor: oi ? 'pointer' : 'not-allowed',
-                            }}
-                            title="Rimuovi del tutto il prodotto dall'ordine"
-                          >
-                            🗑️
-                          </button>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <button
-                              type="button"
-                              onClick={() => handleChangeQuantity(item, -1)}
-                              style={qtyBtnStyle}
-                            >
-                              −
-                            </button>
-
-                            <span
-                              style={{
-                                width: 24,
-                                textAlign: 'center',
-                                fontSize: 13,
-                                fontWeight: qty > 0 ? 700 : 400,
-                                color: qty > 0 ? UI.text : '#999999',
-                              }}
-                            >
-                              {qty}
-                            </span>
-
-                            <button
-                              type="button"
-                              onClick={() => handleChangeQuantity(item, 1)}
-                              style={qtyBtnStyle}
-                            >
-                              +
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {hasDescription && isDescriptionOpen && (
-                        <div
-                          style={{
-                            backgroundColor: UI.descriptionBg,
-                            border: `1px solid ${UI.descriptionBorder}`,
-                            borderRadius: 8,
-                            padding: '8px 10px',
-                            fontSize: 12,
-                            color: UI.descriptionText,
-                            lineHeight: 1.45,
-                          }}
-                        >
-                          {item.description}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        ))}
-      </section>
-    </main>
-  );
-}
-
-const qtyBtnStyle: React.CSSProperties = {
-  width: 28,
-  height: 28,
-  borderRadius: 999,
-  border: `1px solid ${UI.inputBorder}`,
-  cursor: 'pointer',
-  fontSize: 16,
-  backgroundColor: UI.surface,
-  color: UI.text,
-  lineHeight: 1,
-};
-
-const trashBtnStyle: React.CSSProperties = {
-  padding: '4px 8px',
-  borderRadius: 6,
-  border: `1px solid ${UI.border}`,
-  backgroundColor: UI.surface,
-  color: UI.text,
-  fontSize: 13,
-};
-
-const labelStyle: React.CSSProperties = {
-  display: 'block',
-  fontSize: 12,
-  marginBottom: 4,
-  color: UI.text,
-};
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '8px 10px',
-  border: `1px solid ${UI.inputBorder}`,
-  borderRadius: 6,
-  fontSize: 14,
-  color: UI.text,
-  backgroundColor: UI.inputBg,
-};
-
-const textareaStyle: React.CSSProperties = {
-  width: '100%',
-  minHeight: 80,
-  resize: 'vertical',
-  padding: '8px 10px',
-  border: `1px solid ${UI.inputBorder}`,
-  borderRadius: 6,
-  fontSize: 14,
-  color: UI.text,
-  backgroundColor: UI.inputBg,
-  fontFamily: 'inherit',
-  lineHeight: 1.4,
-};
+           
