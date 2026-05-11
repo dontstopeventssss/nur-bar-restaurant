@@ -22,7 +22,8 @@ type TableRow = {
 const GRID_SIZE = 20;
 const MAP_WIDTH = 980;
 const MAP_HEIGHT = 620;
-const TABLE_SIZE = 56;
+const TABLE_WIDTH = 62;
+const TABLE_HEIGHT = 62;
 const DRAG_THRESHOLD = 8;
 
 export default function StaffPage() {
@@ -33,6 +34,7 @@ export default function StaffPage() {
   const [search, setSearch] = useState('');
   const [newTableName, setNewTableName] = useState('');
   const [statusMenuTableId, setStatusMenuTableId] = useState<string | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(true);
 
   const dragStateRef = useRef<{
     tableId: string | null;
@@ -55,8 +57,6 @@ export default function StaffPage() {
     liveX: 0,
     liveY: 0,
   });
-
-  const mapRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     loadTables();
@@ -191,8 +191,6 @@ export default function StaffPage() {
     e: React.PointerEvent<HTMLButtonElement>,
     table: TableRow
   ) {
-    if (!mapRef.current) return;
-
     e.preventDefault();
     e.stopPropagation();
 
@@ -217,7 +215,6 @@ export default function StaffPage() {
   ) {
     const drag = dragStateRef.current;
     if (drag.tableId !== table.id || drag.pointerId !== e.pointerId) return;
-    if (!mapRef.current) return;
 
     const dx = e.clientX - drag.startClientX;
     const dy = e.clientY - drag.startClientY;
@@ -229,8 +226,8 @@ export default function StaffPage() {
 
     if (!drag.moved) return;
 
-    const maxX = MAP_WIDTH - TABLE_SIZE;
-    const maxY = MAP_HEIGHT - TABLE_SIZE;
+    const maxX = MAP_WIDTH - TABLE_WIDTH;
+    const maxY = MAP_HEIGHT - TABLE_HEIGHT;
 
     const nextX = clamp(snapToGrid(drag.startX + dx), 0, maxX);
     const nextY = clamp(snapToGrid(drag.startY + dy), 0, maxY);
@@ -317,10 +314,10 @@ export default function StaffPage() {
     >
       <div
         style={{
-          maxWidth: 1400,
+          maxWidth: 1450,
           margin: '0 auto',
           display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1.3fr) minmax(300px, 0.7fr)',
+          gridTemplateColumns: 'minmax(0, 1.35fr) minmax(320px, 0.65fr)',
           gap: 12,
         }}
       >
@@ -350,356 +347,373 @@ export default function StaffPage() {
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => router.push('/')}
-              style={{
-                padding: '8px 12px',
-                borderRadius: 8,
-                border: '1px solid #ccc',
-                background: '#fff',
-                color: '#111',
-                cursor: 'pointer',
-                fontWeight: 600,
-              }}
-            >
-              ← Home
-            </button>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen((prev) => !prev)}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 8,
+                  border: '1px solid #ccc',
+                  background: '#fff',
+                  color: '#111',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                {mobileMenuOpen ? 'Nascondi menù' : 'Mostra menù'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => router.push('/')}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 8,
+                  border: '1px solid #ccc',
+                  background: '#fff',
+                  color: '#111',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                ← Home
+              </button>
+            </div>
           </div>
 
           <div
-            ref={mapRef}
             style={{
               position: 'relative',
               width: '100%',
-              minHeight: 640,
               overflow: 'auto',
               borderRadius: 12,
               border: '1px solid #cbd5e1',
-              backgroundColor: '#eaf2ff',
-              backgroundImage: `
-                linear-gradient(to right, rgba(100,116,139,0.12) 1px, transparent 1px),
-                linear-gradient(to bottom, rgba(100,116,139,0.12) 1px, transparent 1px)
-              `,
-              backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
-              touchAction: 'none',
+              backgroundColor: '#f8fafc',
+              minHeight: 640,
             }}
           >
-            <svg
-              viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
+            <div
               style={{
+                position: 'relative',
                 width: MAP_WIDTH,
                 height: MAP_HEIGHT,
-                display: 'block',
+                backgroundImage: `
+                  linear-gradient(to right, rgba(100,116,139,0.08) 1px, transparent 1px),
+                  linear-gradient(to bottom, rgba(100,116,139,0.08) 1px, transparent 1px),
+                  url('/piantina-nur.jpg')
+                `,
+                backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px, ${GRID_SIZE}px ${GRID_SIZE}px, contain`,
+                backgroundRepeat: 'repeat, repeat, no-repeat',
+                backgroundPosition: '0 0, 0 0, center center',
+                touchAction: 'none',
               }}
             >
-              <polygon
-                points="180,70 470,70 470,180 585,180 790,450 685,530 510,300 420,300 420,430 250,430 250,300 180,300"
-                fill="#2563eb"
-                opacity={0.18}
-                stroke="#1d4ed8"
-                strokeWidth="6"
-              />
-            </svg>
+              {tables.map((table) => {
+                const colors = getStatusColors(table.status);
 
-            {tables.map((table) => {
-              const colors = getStatusColors(table.status);
-
-              return (
-                <button
-                  key={table.id}
-                  type="button"
-                  onPointerDown={(e) => handlePointerDown(e, table)}
-                  onPointerMove={(e) => handlePointerMove(e, table)}
-                  onPointerUp={(e) => handlePointerUp(e, table)}
-                  onPointerCancel={(e) => handlePointerCancel(e, table)}
-                  style={{
-                    position: 'absolute',
-                    left: table.x,
-                    top: table.y,
-                    width: TABLE_SIZE,
-                    height: TABLE_SIZE,
-                    borderRadius: 999,
-                    border: `3px solid ${colors.border}`,
-                    background: colors.bg,
-                    color: colors.text,
-                    fontWeight: 800,
-                    fontSize: 12,
-                    cursor: 'grab',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 4px 10px rgba(0,0,0,0.10)',
-                    userSelect: 'none',
-                    touchAction: 'none',
-                  }}
-                  title={`${table.name} - ${table.status}`}
-                >
-                  {table.name}
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={table.id}
+                    type="button"
+                    onPointerDown={(e) => handlePointerDown(e, table)}
+                    onPointerMove={(e) => handlePointerMove(e, table)}
+                    onPointerUp={(e) => handlePointerUp(e, table)}
+                    onPointerCancel={(e) => handlePointerCancel(e, table)}
+                    style={{
+                      position: 'absolute',
+                      left: table.x,
+                      top: table.y,
+                      width: TABLE_WIDTH,
+                      height: TABLE_HEIGHT,
+                      borderRadius: 8,
+                      border: `3px solid ${colors.border}`,
+                      background: colors.bg,
+                      color: colors.text,
+                      fontWeight: 800,
+                      fontSize: 12,
+                      cursor: 'grab',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      textAlign: 'center',
+                      boxShadow: '0 4px 10px rgba(0,0,0,0.12)',
+                      userSelect: 'none',
+                      touchAction: 'none',
+                      padding: 4,
+                    }}
+                    title={`${table.name} - ${table.status}`}
+                  >
+                    {table.name}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </section>
 
-        <aside
-          style={{
-            background: '#fff',
-            border: '1px solid #ddd',
-            borderRadius: 14,
-            padding: 12,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 12,
-          }}
-        >
-          <section
+        {mobileMenuOpen && (
+          <aside
             style={{
-              border: '1px solid #e5e7eb',
-              borderRadius: 12,
-              padding: 10,
-              background: '#fafafa',
+              background: '#fff',
+              border: '1px solid #ddd',
+              borderRadius: 14,
+              padding: 12,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
             }}
           >
-            <h2 style={{ margin: '0 0 8px 0', fontSize: 16 }}>Aggiungi tavolo</h2>
+            <section
+              style={{
+                border: '1px solid #e5e7eb',
+                borderRadius: 12,
+                padding: 10,
+                background: '#fafafa',
+              }}
+            >
+              <h2 style={{ margin: '0 0 8px 0', fontSize: 16 }}>Aggiungi tavolo</h2>
 
-            <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  type="text"
+                  value={newTableName}
+                  onChange={(e) => setNewTableName(e.target.value)}
+                  placeholder="Es. T12"
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    border: '1px solid #ccc',
+                    fontSize: 14,
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddTable}
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: '#111',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    fontWeight: 700,
+                  }}
+                >
+                  Aggiungi
+                </button>
+              </div>
+            </section>
+
+            <section
+              style={{
+                border: '1px solid #e5e7eb',
+                borderRadius: 12,
+                padding: 10,
+                background: '#fafafa',
+              }}
+            >
+              <h2 style={{ margin: '0 0 8px 0', fontSize: 16 }}>Cerca tavolo</h2>
               <input
                 type="text"
-                value={newTableName}
-                onChange={(e) => setNewTableName(e.target.value)}
-                placeholder="Es. T12"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Es. T1, Banco..."
                 style={{
-                  flex: 1,
-                  minWidth: 0,
+                  width: '100%',
                   padding: '8px 10px',
                   borderRadius: 8,
                   border: '1px solid #ccc',
                   fontSize: 14,
                 }}
               />
-              <button
-                type="button"
-                onClick={handleAddTable}
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                  border: 'none',
-                  background: '#111',
-                  color: '#fff',
-                  cursor: 'pointer',
-                  fontWeight: 700,
-                }}
-              >
-                Aggiungi
-              </button>
-            </div>
-          </section>
+            </section>
 
-          <section
-            style={{
-              border: '1px solid #e5e7eb',
-              borderRadius: 12,
-              padding: 10,
-              background: '#fafafa',
-            }}
-          >
-            <h2 style={{ margin: '0 0 8px 0', fontSize: 16 }}>Cerca tavolo</h2>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Es. T1, Banco..."
+            <section
               style={{
-                width: '100%',
-                padding: '8px 10px',
-                borderRadius: 8,
-                border: '1px solid #ccc',
-                fontSize: 14,
-              }}
-            />
-          </section>
-
-          <section
-            style={{
-              border: '1px solid #e5e7eb',
-              borderRadius: 12,
-              padding: 10,
-              background: '#fafafa',
-              minHeight: 220,
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: 8,
-                marginBottom: 10,
+                border: '1px solid #e5e7eb',
+                borderRadius: 12,
+                padding: 10,
+                background: '#fafafa',
+                minHeight: 220,
               }}
             >
-              <h2 style={{ margin: 0, fontSize: 16 }}>Lista tavoli</h2>
-              <span style={{ fontSize: 12, color: '#666' }}>
-                {loading ? 'Caricamento…' : `${filteredTables.length} tavoli`}
-              </span>
-            </div>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 8,
+                  marginBottom: 10,
+                }}
+              >
+                <h2 style={{ margin: 0, fontSize: 16 }}>Lista tavoli</h2>
+                <span style={{ fontSize: 12, color: '#666' }}>
+                  {loading ? 'Caricamento…' : `${filteredTables.length} tavoli`}
+                </span>
+              </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {filteredTables.map((table) => {
-                const colors = getStatusColors(table.status);
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {filteredTables.map((table) => {
+                  const colors = getStatusColors(table.status);
 
-                return (
-                  <div
-                    key={table.id}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr auto auto',
-                      gap: 8,
-                      alignItems: 'center',
-                    }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => router.push(`/staff/table/${table.id}`)}
+                  return (
+                    <div
+                      key={table.id}
                       style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        borderRadius: 10,
-                        border: `2px solid ${colors.border}`,
-                        background: colors.bg,
-                        color: colors.text,
-                        fontWeight: 800,
-                        fontSize: 14,
-                        textAlign: 'left',
-                        cursor: 'pointer',
+                        display: 'grid',
+                        gridTemplateColumns: '1fr auto auto',
+                        gap: 8,
+                        alignItems: 'center',
                       }}
                     >
-                      {table.name} · {table.status}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setStatusMenuTableId((prev) =>
-                          prev === table.id ? null : table.id
-                        );
-                      }}
-                      style={{
-                        padding: '10px 12px',
-                        borderRadius: 10,
-                        border: '1px solid #ccc',
-                        background: '#fff',
-                        color: '#111',
-                        cursor: 'pointer',
-                        fontWeight: 700,
-                        fontSize: 12,
-                      }}
-                    >
-                      Stato
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => router.push(`/staff/table/${table.id}`)}
-                      style={{
-                        padding: '10px 12px',
-                        borderRadius: 10,
-                        border: '1px solid #111',
-                        background: '#111',
-                        color: '#fff',
-                        cursor: 'pointer',
-                        fontWeight: 700,
-                        fontSize: 12,
-                      }}
-                    >
-                      Ordine
-                    </button>
-
-                    {statusMenuTableId === table.id && (
-                      <div
-                        onClick={(e) => e.stopPropagation()}
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/staff/table/${table.id}`)}
                         style={{
-                          gridColumn: '1 / -1',
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(3, 1fr)',
-                          gap: 8,
-                          padding: 8,
+                          width: '100%',
+                          padding: '10px 12px',
                           borderRadius: 10,
-                          border: '1px solid #ddd',
-                          background: '#fff',
+                          border: `2px solid ${colors.border}`,
+                          background: colors.bg,
+                          color: colors.text,
+                          fontWeight: 800,
+                          fontSize: 14,
+                          textAlign: 'left',
+                          cursor: 'pointer',
                         }}
                       >
-                        <button
-                          type="button"
-                          onClick={() => handleChangeStatus(table.id, 'libero')}
-                          style={{
-                            padding: '8px 10px',
-                            borderRadius: 8,
-                            border: '2px solid #16a34a',
-                            background: '#dcfce7',
-                            color: '#166534',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Libero
-                        </button>
+                        {table.name} · {table.status}
+                      </button>
 
-                        <button
-                          type="button"
-                          onClick={() => handleChangeStatus(table.id, 'prenotato')}
-                          style={{
-                            padding: '8px 10px',
-                            borderRadius: 8,
-                            border: '2px solid #ea580c',
-                            background: '#fed7aa',
-                            color: '#9a3412',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Prenotato
-                        </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setStatusMenuTableId((prev) =>
+                            prev === table.id ? null : table.id
+                          );
+                        }}
+                        style={{
+                          padding: '10px 12px',
+                          borderRadius: 10,
+                          border: '1px solid #ccc',
+                          background: '#fff',
+                          color: '#111',
+                          cursor: 'pointer',
+                          fontWeight: 700,
+                          fontSize: 12,
+                        }}
+                      >
+                        Stato
+                      </button>
 
-                        <button
-                          type="button"
-                          onClick={() => handleChangeStatus(table.id, 'occupato')}
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/staff/table/${table.id}`)}
+                        style={{
+                          padding: '10px 12px',
+                          borderRadius: 10,
+                          border: '1px solid #111',
+                          background: '#111',
+                          color: '#fff',
+                          cursor: 'pointer',
+                          fontWeight: 700,
+                          fontSize: 12,
+                        }}
+                      >
+                        Ordine
+                      </button>
+
+                      {statusMenuTableId === table.id && (
+                        <div
+                          onClick={(e) => e.stopPropagation()}
                           style={{
-                            padding: '8px 10px',
-                            borderRadius: 8,
-                            border: '2px solid #dc2626',
-                            background: '#fee2e2',
-                            color: '#991b1b',
-                            fontWeight: 700,
-                            cursor: 'pointer',
+                            gridColumn: '1 / -1',
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(3, 1fr)',
+                            gap: 8,
+                            padding: 8,
+                            borderRadius: 10,
+                            border: '1px solid #ddd',
+                            background: '#fff',
                           }}
                         >
-                          Occupato
-                        </button>
-                      </div>
-                    )}
+                          <button
+                            type="button"
+                            onClick={() => handleChangeStatus(table.id, 'libero')}
+                            style={{
+                              padding: '8px 10px',
+                              borderRadius: 8,
+                              border: '2px solid #16a34a',
+                              background: '#dcfce7',
+                              color: '#166534',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Libero
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleChangeStatus(table.id, 'prenotato')
+                            }
+                            style={{
+                              padding: '8px 10px',
+                              borderRadius: 8,
+                              border: '2px solid #ea580c',
+                              background: '#fed7aa',
+                              color: '#9a3412',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Prenotato
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleChangeStatus(table.id, 'occupato')}
+                            style={{
+                              padding: '8px 10px',
+                              borderRadius: 8,
+                              border: '2px solid #dc2626',
+                              background: '#fee2e2',
+                              color: '#991b1b',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Occupato
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {!loading && filteredTables.length === 0 && (
+                  <div
+                    style={{
+                      padding: 12,
+                      borderRadius: 10,
+                      background: '#fff',
+                      border: '1px dashed #ccc',
+                      color: '#666',
+                      fontSize: 13,
+                    }}
+                  >
+                    Nessun tavolo trovato.
                   </div>
-                );
-              })}
-
-              {!loading && filteredTables.length === 0 && (
-                <div
-                  style={{
-                    padding: 12,
-                    borderRadius: 10,
-                    background: '#fff',
-                    border: '1px dashed #ccc',
-                    color: '#666',
-                    fontSize: 13,
-                  }}
-                >
-                  Nessun tavolo trovato.
-                </div>
-              )}
-            </div>
-          </section>
-        </aside>
+                )}
+              </div>
+            </section>
+          </aside>
+        )}
       </div>
     </main>
   );
