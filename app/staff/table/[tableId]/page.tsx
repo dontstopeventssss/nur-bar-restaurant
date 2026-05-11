@@ -53,6 +53,38 @@ type OrderItem = {
 
 type OrderItemsMap = Record<string, OrderItem>;
 
+const UI = {
+  bg: '#ffffff',
+  surface: '#ffffff',
+  surfaceAlt: '#fafafa',
+  surfaceMuted: '#f3f4f6',
+  border: '#dddddd',
+  borderSoft: '#eeeeee',
+  text: '#111111',
+  textMuted: '#666666',
+  textSoft: '#777777',
+  primary: '#01696f',
+  primaryText: '#ffffff',
+  warning: '#f59e0b',
+  warningText: '#ffffff',
+  success: '#059669',
+  successText: '#ffffff',
+  danger: '#dc2626',
+  dangerSoft: '#fee2e2',
+  dangerText: '#991b1b',
+  pendingBg: '#fffbeb',
+  pendingText: '#92400e',
+  badgeInfoBg: '#e2e8f0',
+  badgeInfoText: '#111111',
+  descriptionBg: '#f8fafc',
+  descriptionBorder: '#e2e8f0',
+  descriptionText: '#334155',
+  fuoriMenuBg: '#fee2e2',
+  fuoriMenuText: '#991b1b',
+  inputBg: '#ffffff',
+  inputBorder: '#cccccc',
+};
+
 export default function TableOrderPage() {
   const router = useRouter();
   const params = useParams<{ tableId: string }>();
@@ -80,6 +112,10 @@ export default function TableOrderPage() {
   const [newProductDestination, setNewProductDestination] = useState<'bar' | 'kitchen'>('bar');
   const [newProductDescription, setNewProductDescription] = useState('');
 
+  const [isEditingTableName, setIsEditingTableName] = useState(false);
+  const [editedTableName, setEditedTableName] = useState('');
+  const [renamingTable, setRenamingTable] = useState(false);
+
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -94,7 +130,9 @@ export default function TableOrderPage() {
           return;
         }
 
-        setTable(tableData as Table);
+        const loadedTable = tableData as Table;
+        setTable(loadedTable);
+        setEditedTableName(loadedTable.name);
 
         const { data: ordersData, error: ordersError } = await supabase
           .from('orders')
@@ -229,6 +267,50 @@ export default function TableOrderPage() {
     }
 
     return newOrder;
+  };
+
+  const handleRenameTable = async () => {
+    const nextName = editedTableName.trim();
+
+    if (!table) return;
+    if (!nextName) {
+      alert('Inserisci un nome tavolo valido.');
+      return;
+    }
+
+    if (nextName === table.name) {
+      setIsEditingTableName(false);
+      return;
+    }
+
+    setRenamingTable(true);
+
+    try {
+      const { data, error } = await supabase
+        .from('tables')
+        .update({ name: nextName })
+        .eq('id', table.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Errore cambio nome tavolo', error);
+        alert('Errore nel cambio nome tavolo.');
+        return;
+      }
+
+      const updatedTable = data as Table;
+      setTable(updatedTable);
+      setEditedTableName(updatedTable.name);
+      setIsEditingTableName(false);
+    } finally {
+      setRenamingTable(false);
+    }
+  };
+
+  const handleCancelRenameTable = () => {
+    setEditedTableName(table?.name ?? '');
+    setIsEditingTableName(false);
   };
 
   const handleChangeQuantity = (item: MenuItem, delta: number) => {
@@ -503,10 +585,10 @@ export default function TableOrderPage() {
     if (!order || total <= 0) return;
 
     if (Object.keys(pendingItems).length > 0) {
-      const confirm = window.confirm(
+      const confirmClose = window.confirm(
         '⚠️ Hai prodotti selezionati ma non ancora inviati a bar/cucina. Vuoi chiudere il conto comunque?'
       );
-      if (!confirm) return;
+      if (!confirmClose) return;
     }
 
     setClosing(true);
@@ -542,28 +624,36 @@ export default function TableOrderPage() {
   };
 
   if (loading) {
-    return <div style={{ padding: 16, color: '#111' }}>Caricamento ordine tavolo…</div>;
+    return (
+      <div style={{ padding: 16, color: UI.text }}>
+        Caricamento ordine tavolo…
+      </div>
+    );
   }
 
   if (!table) {
-    return <div style={{ padding: 16, color: 'red' }}>Tavolo non trovato.</div>;
+    return (
+      <div style={{ padding: 16, color: UI.danger }}>
+        Tavolo non trovato.
+      </div>
+    );
   }
 
   const hasPending = Object.keys(pendingItems).length > 0;
 
   return (
-    <main style={{ padding: 16, backgroundColor: 'white', color: '#111' }}>
+    <main style={{ padding: 16, backgroundColor: UI.bg, color: UI.text }}>
       <button
         type="button"
         onClick={() => router.push('/staff')}
         style={{
           marginBottom: 12,
           fontSize: 14,
-          color: '#111',
-          border: '1px solid #ddd',
+          color: UI.text,
+          border: `1px solid ${UI.border}`,
           borderRadius: 6,
           padding: '6px 10px',
-          backgroundColor: '#fff',
+          backgroundColor: UI.surface,
         }}
       >
         ← Torna alla mappa tavoli
@@ -579,11 +669,110 @@ export default function TableOrderPage() {
           flexWrap: 'wrap',
         }}
       >
-        <div>
-          <h1 style={{ fontSize: 24, marginBottom: 4, color: '#111' }}>
-            Tavolo {table.name}
-          </h1>
-          <div style={{ fontSize: 13, color: '#111' }}>
+        <div style={{ flex: 1, minWidth: 260 }}>
+          {!isEditingTableName ? (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                flexWrap: 'wrap',
+              }}
+            >
+              <h1 style={{ fontSize: 24, margin: 0, color: UI.text }}>
+                Tavolo {table.name}
+              </h1>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEditedTableName(table.name);
+                  setIsEditingTableName(true);
+                }}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 999,
+                  border: `1px solid ${UI.border}`,
+                  backgroundColor: UI.surface,
+                  color: UI.text,
+                  cursor: 'pointer',
+                  fontSize: 15,
+                  lineHeight: 1,
+                }}
+                title="Modifica nome tavolo"
+              >
+                ✏️
+              </button>
+            </div>
+          ) : (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                flexWrap: 'wrap',
+              }}
+            >
+              <input
+                type="text"
+                value={editedTableName}
+                onChange={(e) => setEditedTableName(e.target.value)}
+                placeholder="Nuovo nome tavolo"
+                style={{
+                  ...inputStyle,
+                  width: 220,
+                }}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleRenameTable();
+                  }
+                  if (e.key === 'Escape') {
+                    handleCancelRenameTable();
+                  }
+                }}
+              />
+
+              <button
+                type="button"
+                onClick={handleRenameTable}
+                disabled={renamingTable}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 6,
+                  border: 'none',
+                  backgroundColor: renamingTable ? UI.inputBorder : UI.primary,
+                  color: UI.primaryText,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: renamingTable ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {renamingTable ? 'Salvataggio…' : 'Salva'}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCancelRenameTable}
+                disabled={renamingTable}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 6,
+                  border: `1px solid ${UI.border}`,
+                  backgroundColor: UI.surface,
+                  color: UI.text,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: renamingTable ? 'not-allowed' : 'pointer',
+                }}
+              >
+                Annulla
+              </button>
+            </div>
+          )}
+
+          <div style={{ fontSize: 13, color: UI.text, marginTop: 6 }}>
             Stato tavolo: <strong>{table.status}</strong>
             {order && (
               <>
@@ -594,13 +783,13 @@ export default function TableOrderPage() {
         </div>
 
         <div style={{ textAlign: 'right', minWidth: 160 }}>
-          <div style={{ fontSize: 12, color: '#666' }}>Totale ordine</div>
-          <div style={{ fontSize: 26, fontWeight: 700, color: '#111' }}>
+          <div style={{ fontSize: 12, color: UI.textMuted }}>Totale ordine</div>
+          <div style={{ fontSize: 26, fontWeight: 700, color: UI.text }}>
             € {total.toFixed(2)}
           </div>
 
           {hasPending && (
-            <div style={{ fontSize: 12, color: '#92400e', marginTop: 2 }}>
+            <div style={{ fontSize: 12, color: UI.pendingText, marginTop: 2 }}>
               + € {pendingTotal.toFixed(2)} da inviare
             </div>
           )}
@@ -618,8 +807,8 @@ export default function TableOrderPage() {
                 fontSize: 14,
                 fontWeight: 700,
                 cursor: sending ? 'not-allowed' : 'pointer',
-                backgroundColor: sending ? '#ccc' : '#f59e0b',
-                color: 'white',
+                backgroundColor: sending ? UI.inputBorder : UI.warning,
+                color: UI.warningText,
                 display: 'block',
                 width: '100%',
               }}
@@ -644,8 +833,9 @@ export default function TableOrderPage() {
               fontSize: 13,
               fontWeight: 600,
               cursor: !order || total <= 0 || closing ? 'not-allowed' : 'pointer',
-              backgroundColor: !order || total <= 0 || closing ? '#ccc' : '#059669',
-              color: 'white',
+              backgroundColor:
+                !order || total <= 0 || closing ? UI.inputBorder : UI.success,
+              color: UI.successText,
               display: 'block',
               width: '100%',
             }}
@@ -667,7 +857,7 @@ export default function TableOrderPage() {
         <div style={{ minWidth: 240, flex: 1 }}>
           <label
             htmlFor="product-search"
-            style={{ display: 'block', fontSize: 12, marginBottom: 4, color: '#111' }}
+            style={{ display: 'block', fontSize: 12, marginBottom: 4, color: UI.text }}
           >
             Cerca prodotto
           </label>
@@ -680,11 +870,11 @@ export default function TableOrderPage() {
             style={{
               width: '100%',
               padding: '8px 10px',
-              border: '1px solid #ccc',
+              border: `1px solid ${UI.inputBorder}`,
               borderRadius: 6,
               fontSize: 14,
-              color: '#111',
-              backgroundColor: '#fff',
+              color: UI.text,
+              backgroundColor: UI.inputBg,
             }}
           />
         </div>
@@ -695,9 +885,9 @@ export default function TableOrderPage() {
           style={{
             padding: '8px 12px',
             borderRadius: 6,
-            border: '1px solid #01696f',
-            backgroundColor: showCreateProduct ? '#01696f' : '#fff',
-            color: showCreateProduct ? 'white' : '#111',
+            border: `1px solid ${UI.primary}`,
+            backgroundColor: showCreateProduct ? UI.primary : UI.surface,
+            color: showCreateProduct ? UI.primaryText : UI.text,
             fontSize: 13,
             fontWeight: 600,
           }}
@@ -710,13 +900,13 @@ export default function TableOrderPage() {
         <section
           style={{
             marginBottom: 18,
-            border: '1px solid #ddd',
+            border: `1px solid ${UI.border}`,
             borderRadius: 8,
             padding: 12,
-            backgroundColor: '#fafafa',
+            backgroundColor: UI.surfaceAlt,
           }}
         >
-          <h2 style={{ fontSize: 16, marginBottom: 10, color: '#111' }}>
+          <h2 style={{ fontSize: 16, marginBottom: 10, color: UI.text }}>
             Crea prodotto fuori menù
           </h2>
 
@@ -809,8 +999,8 @@ export default function TableOrderPage() {
                 padding: '8px 14px',
                 borderRadius: 6,
                 border: 'none',
-                backgroundColor: '#01696f',
-                color: 'white',
+                backgroundColor: UI.primary,
+                color: UI.primaryText,
                 fontSize: 13,
                 fontWeight: 600,
               }}
@@ -821,9 +1011,13 @@ export default function TableOrderPage() {
         </section>
       )}
 
-      {(saving || sending) && (
-        <div style={{ fontSize: 11, color: '#666', marginBottom: 8 }}>
-          {sending ? 'Invio ordine in corso…' : 'Salvataggio modifiche…'}
+      {(saving || sending || renamingTable) && (
+        <div style={{ fontSize: 11, color: UI.textMuted, marginBottom: 8 }}>
+          {renamingTable
+            ? 'Salvataggio nome tavolo…'
+            : sending
+            ? 'Invio ordine in corso…'
+            : 'Salvataggio modifiche…'}
         </div>
       )}
 
@@ -832,26 +1026,26 @@ export default function TableOrderPage() {
           <div
             key={category.id}
             style={{
-              border: '1px solid #ddd',
+              border: `1px solid ${UI.border}`,
               borderRadius: 8,
               overflow: 'hidden',
-              backgroundColor: '#fff',
+              backgroundColor: UI.surface,
             }}
           >
             <div
               style={{
                 padding: '6px 10px',
-                backgroundColor: '#f3f4f6',
+                backgroundColor: UI.surfaceMuted,
                 fontWeight: 600,
                 fontSize: 14,
-                color: '#111',
+                color: UI.text,
               }}
             >
               {category.name}
             </div>
 
             {category.items.length === 0 ? (
-              <div style={{ padding: 8, fontSize: 12, color: '#777' }}>
+              <div style={{ padding: 8, fontSize: 12, color: UI.textSoft }}>
                 Nessun prodotto trovato in questa categoria.
               </div>
             ) : (
@@ -870,10 +1064,10 @@ export default function TableOrderPage() {
                         padding: '8px 10px',
                         display: 'flex',
                         flexDirection: 'column',
-                        borderTop: '1px solid #eee',
+                        borderTop: `1px solid ${UI.borderSoft}`,
                         gap: 8,
-                        color: '#111',
-                        backgroundColor: pendingQty > 0 ? '#fffbeb' : 'white',
+                        color: UI.text,
+                        backgroundColor: pendingQty > 0 ? UI.pendingBg : UI.surface,
                       }}
                     >
                       <div
@@ -893,7 +1087,7 @@ export default function TableOrderPage() {
                               flexWrap: 'wrap',
                             }}
                           >
-                            <div style={{ fontSize: 14, fontWeight: 500, color: '#111' }}>
+                            <div style={{ fontSize: 14, fontWeight: 500, color: UI.text }}>
                               {item.name}
                             </div>
 
@@ -904,8 +1098,8 @@ export default function TableOrderPage() {
                                   fontWeight: 700,
                                   padding: '2px 6px',
                                   borderRadius: 999,
-                                  backgroundColor: '#fee2e2',
-                                  color: '#991b1b',
+                                  backgroundColor: UI.fuoriMenuBg,
+                                  color: UI.fuoriMenuText,
                                 }}
                               >
                                 FUORI MENÙ
@@ -921,9 +1115,11 @@ export default function TableOrderPage() {
                                   )
                                 }
                                 style={{
-                                  border: '1px solid #cbd5e1',
-                                  backgroundColor: isDescriptionOpen ? '#e2e8f0' : '#fff',
-                                  color: '#111',
+                                  border: `1px solid ${UI.inputBorder}`,
+                                  backgroundColor: isDescriptionOpen
+                                    ? UI.badgeInfoBg
+                                    : UI.surface,
+                                  color: UI.badgeInfoText,
                                   borderRadius: 999,
                                   width: 24,
                                   height: 24,
@@ -948,7 +1144,13 @@ export default function TableOrderPage() {
                               marginTop: 2,
                             }}
                           >
-                            <span style={{ fontSize: 10, color: '#888', fontWeight: 500 }}>
+                            <span
+                              style={{
+                                fontSize: 10,
+                                color: UI.textSoft,
+                                fontWeight: 500,
+                              }}
+                            >
                               {item.destination === 'kitchen' ? '🍽️ cucina' : '🍹 bar'}
                             </span>
 
@@ -960,8 +1162,8 @@ export default function TableOrderPage() {
                                   fontWeight: 700,
                                   padding: '2px 6px',
                                   borderRadius: 4,
-                                  backgroundColor: '#fef3c7',
-                                  color: '#92400e',
+                                  backgroundColor: UI.pendingBg,
+                                  color: UI.pendingText,
                                 }}
                               >
                                 +{pendingQty} da inviare
@@ -979,7 +1181,7 @@ export default function TableOrderPage() {
                             justifyContent: 'flex-end',
                           }}
                         >
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#111' }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: UI.text }}>
                             € {item.price.toFixed(2)}
                           </div>
 
@@ -1012,7 +1214,7 @@ export default function TableOrderPage() {
                                 textAlign: 'center',
                                 fontSize: 13,
                                 fontWeight: qty > 0 ? 700 : 400,
-                                color: qty > 0 ? '#111' : '#999',
+                                color: qty > 0 ? UI.text : '#999999',
                               }}
                             >
                               {qty}
@@ -1032,12 +1234,12 @@ export default function TableOrderPage() {
                       {hasDescription && isDescriptionOpen && (
                         <div
                           style={{
-                            backgroundColor: '#f8fafc',
-                            border: '1px solid #e2e8f0',
+                            backgroundColor: UI.descriptionBg,
+                            border: `1px solid ${UI.descriptionBorder}`,
                             borderRadius: 8,
                             padding: '8px 10px',
                             fontSize: 12,
-                            color: '#334155',
+                            color: UI.descriptionText,
                             lineHeight: 1.45,
                           }}
                         >
@@ -1060,20 +1262,20 @@ const qtyBtnStyle: React.CSSProperties = {
   width: 28,
   height: 28,
   borderRadius: 999,
-  border: '1px solid #ccc',
+  border: `1px solid ${UI.inputBorder}`,
   cursor: 'pointer',
   fontSize: 16,
-  backgroundColor: 'white',
-  color: '#111',
+  backgroundColor: UI.surface,
+  color: UI.text,
   lineHeight: 1,
 };
 
 const trashBtnStyle: React.CSSProperties = {
   padding: '4px 8px',
   borderRadius: 6,
-  border: '1px solid #ddd',
-  backgroundColor: '#fff',
-  color: '#111',
+  border: `1px solid ${UI.border}`,
+  backgroundColor: UI.surface,
+  color: UI.text,
   fontSize: 13,
 };
 
@@ -1081,17 +1283,17 @@ const labelStyle: React.CSSProperties = {
   display: 'block',
   fontSize: 12,
   marginBottom: 4,
-  color: '#111',
+  color: UI.text,
 };
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
   padding: '8px 10px',
-  border: '1px solid #ccc',
+  border: `1px solid ${UI.inputBorder}`,
   borderRadius: 6,
   fontSize: 14,
-  color: '#111',
-  backgroundColor: '#fff',
+  color: UI.text,
+  backgroundColor: UI.inputBg,
 };
 
 const textareaStyle: React.CSSProperties = {
@@ -1099,11 +1301,11 @@ const textareaStyle: React.CSSProperties = {
   minHeight: 80,
   resize: 'vertical',
   padding: '8px 10px',
-  border: '1px solid #ccc',
+  border: `1px solid ${UI.inputBorder}`,
   borderRadius: 6,
   fontSize: 14,
-  color: '#111',
-  backgroundColor: '#fff',
+  color: UI.text,
+  backgroundColor: UI.inputBg,
   fontFamily: 'inherit',
   lineHeight: 1.4,
 };
