@@ -26,15 +26,12 @@ const TABLE_WIDTH = 35;
 const TABLE_HEIGHT = 35;
 const DRAG_THRESHOLD = 8;
 
-const INITIAL_FLOOR_ROTATION = -44;
-const INITIAL_FLOOR_SCALE = 0.97;
-const INITIAL_FLOOR_OFFSET_X = -33;
-const INITIAL_FLOOR_OFFSET_Y = -9;
+const FLOOR_ROTATION = -44;
+const FLOOR_SCALE = 0.97;
+const FLOOR_OFFSET_X = -33;
+const FLOOR_OFFSET_Y = -9;
 
-const INITIAL_CLIP_TOP = 6;
-const INITIAL_CLIP_RIGHT = 7;
-const INITIAL_CLIP_BOTTOM = 8;
-const INITIAL_CLIP_LEFT = 7;
+const MAP_CLIP_PATH = 'inset(29% 15% 23% 14% round 12px)';
 
 export default function StaffPage() {
   const router = useRouter();
@@ -46,16 +43,6 @@ export default function StaffPage() {
   const [statusMenuTableId, setStatusMenuTableId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [showMap, setShowMap] = useState(true);
-
-  const [floorRotation, setFloorRotation] = useState(INITIAL_FLOOR_ROTATION);
-  const [floorScale, setFloorScale] = useState(INITIAL_FLOOR_SCALE);
-  const [floorOffsetX, setFloorOffsetX] = useState(INITIAL_FLOOR_OFFSET_X);
-  const [floorOffsetY, setFloorOffsetY] = useState(INITIAL_FLOOR_OFFSET_Y);
-
-  const [clipTop, setClipTop] = useState(INITIAL_CLIP_TOP);
-  const [clipRight, setClipRight] = useState(INITIAL_CLIP_RIGHT);
-  const [clipBottom, setClipBottom] = useState(INITIAL_CLIP_BOTTOM);
-  const [clipLeft, setClipLeft] = useState(INITIAL_CLIP_LEFT);
 
   const dragStateRef = useRef<{
     tableId: string | null;
@@ -334,8 +321,6 @@ export default function StaffPage() {
     return tables.filter((table) => table.name.toLowerCase().includes(q));
   }, [tables, search]);
 
-  const mapClipPath = `inset(${clipTop}% ${clipRight}% ${clipBottom}% ${clipLeft}% round 12px)`;
-
   return (
     <main
       style={{
@@ -416,263 +401,112 @@ export default function StaffPage() {
           </div>
 
           {showMap && (
-            <>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, minmax(0, 1fr))',
-                  gap: 10,
-                  marginBottom: 10,
-                  background: '#fafafa',
-                  borderRadius: 12,
-                  padding: 10,
-                }}
-              >
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
-                  Rotazione: {floorRotation}°
-                  <input
-                    type="range"
-                    min={-90}
-                    max={0}
-                    step={1}
-                    value={floorRotation}
-                    onChange={(e) => setFloorRotation(Number(e.target.value))}
-                  />
-                </label>
-
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
-                  Zoom: {floorScale.toFixed(2)}
-                  <input
-                    type="range"
-                    min={0.5}
-                    max={1.5}
-                    step={0.01}
-                    value={floorScale}
-                    onChange={(e) => setFloorScale(Number(e.target.value))}
-                  />
-                </label>
-
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
-                  Sposta X: {floorOffsetX}px
-                  <input
-                    type="range"
-                    min={-220}
-                    max={220}
-                    step={1}
-                    value={floorOffsetX}
-                    onChange={(e) => setFloorOffsetX(Number(e.target.value))}
-                  />
-                </label>
-
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
-                  Sposta Y: {floorOffsetY}px
-                  <input
-                    type="range"
-                    min={-220}
-                    max={220}
-                    step={1}
-                    value={floorOffsetY}
-                    onChange={(e) => setFloorOffsetY(Number(e.target.value))}
-                  />
-                </label>
-
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
-                  Clip sopra: {clipTop}%
-                  <input
-                    type="range"
-                    min={0}
-                    max={25}
-                    step={1}
-                    value={clipTop}
-                    onChange={(e) => setClipTop(Number(e.target.value))}
-                  />
-                </label>
-
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
-                  Clip destra: {clipRight}%
-                  <input
-                    type="range"
-                    min={0}
-                    max={25}
-                    step={1}
-                    value={clipRight}
-                    onChange={(e) => setClipRight(Number(e.target.value))}
-                  />
-                </label>
-
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
-                  Clip sotto: {clipBottom}%
-                  <input
-                    type="range"
-                    min={0}
-                    max={25}
-                    step={1}
-                    value={clipBottom}
-                    onChange={(e) => setClipBottom(Number(e.target.value))}
-                  />
-                </label>
-
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
-                  Clip sinistra: {clipLeft}%
-                  <input
-                    type="range"
-                    min={0}
-                    max={25}
-                    step={1}
-                    value={clipLeft}
-                    onChange={(e) => setClipLeft(Number(e.target.value))}
-                  />
-                </label>
-              </div>
-
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
-                  gap: 10,
-                  marginBottom: 10,
-                }}
-              >
-                <div
-                  style={{
-                    background: '#fafafa',
-                    borderRadius: 12,
-                    padding: 10,
-                    fontSize: 13,
-                    color: '#333',
-                    lineHeight: 1.6,
-                  }}
-                >
-                  <div><strong>Rotazione:</strong> {floorRotation}</div>
-                  <div><strong>Zoom:</strong> {floorScale.toFixed(2)}</div>
-                  <div><strong>X:</strong> {floorOffsetX}</div>
-                  <div><strong>Y:</strong> {floorOffsetY}</div>
-                </div>
-
-                <div
-                  style={{
-                    background: '#fafafa',
-                    borderRadius: 12,
-                    padding: 10,
-                    fontSize: 13,
-                    color: '#333',
-                    lineHeight: 1.6,
-                  }}
-                >
-                  <div><strong>Clip sopra:</strong> {clipTop}</div>
-                  <div><strong>Clip destra:</strong> {clipRight}</div>
-                  <div><strong>Clip sotto:</strong> {clipBottom}</div>
-                  <div><strong>Clip sinistra:</strong> {clipLeft}</div>
-                </div>
-              </div>
-
+            <div
+              style={{
+                position: 'relative',
+                width: '100%',
+                overflowX: 'auto',
+                overflowY: 'hidden',
+              }}
+            >
               <div
                 style={{
                   position: 'relative',
-                  width: '100%',
-                  overflowX: 'auto',
-                  overflowY: 'hidden',
+                  width: MAP_WIDTH,
+                  height: MAP_HEIGHT,
+                  overflow: 'hidden',
+                  borderRadius: 12,
+                  background: '#eef6fb',
+                  clipPath: MAP_CLIP_PATH,
                 }}
               >
+                <img
+                  src="/piantina-nur.jpeg"
+                  alt="Piantina locale NUR"
+                  draggable={false}
+                  style={{
+                    position: 'absolute',
+                    left: '50%',
+                    top: '50%',
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    transform: `translate(calc(-50% + ${FLOOR_OFFSET_X}px), calc(-50% + ${FLOOR_OFFSET_Y}px)) rotate(${FLOOR_ROTATION}deg) scale(${FLOOR_SCALE})`,
+                    transformOrigin: 'center center',
+                    pointerEvents: 'none',
+                    zIndex: 1,
+                  }}
+                />
+
                 <div
                   style={{
-                    position: 'relative',
-                    width: MAP_WIDTH,
-                    height: MAP_HEIGHT,
-                    overflow: 'hidden',
-                    borderRadius: 12,
-                    background: '#eef6fb',
-                    clipPath: mapClipPath,
+                    position: 'absolute',
+                    inset: 0,
+                    backgroundImage: `
+                      linear-gradient(to right, rgba(100,116,139,0.07) 1px, transparent 1px),
+                      linear-gradient(to bottom, rgba(100,116,139,0.07) 1px, transparent 1px)
+                    `,
+                    backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
+                    pointerEvents: 'none',
+                    zIndex: 2,
                   }}
-                >
-                  <img
-                    src="/piantina-nur.jpeg"
-                    alt="Piantina locale NUR"
-                    draggable={false}
-                    style={{
-                      position: 'absolute',
-                      left: '50%',
-                      top: '50%',
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                      transform: `translate(calc(-50% + ${floorOffsetX}px), calc(-50% + ${floorOffsetY}px)) rotate(${floorRotation}deg) scale(${floorScale})`,
-                      transformOrigin: 'center center',
-                      pointerEvents: 'none',
-                      zIndex: 1,
-                    }}
-                  />
+                />
 
-                  <div
-                    style={{
-                      position: 'absolute',
-                      inset: 0,
-                      backgroundImage: `
-                        linear-gradient(to right, rgba(100,116,139,0.07) 1px, transparent 1px),
-                        linear-gradient(to bottom, rgba(100,116,139,0.07) 1px, transparent 1px)
-                      `,
-                      backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
-                      pointerEvents: 'none',
-                      zIndex: 2,
-                    }}
-                  />
+                {tables.map((table) => {
+                  const colors = getStatusColors(table.status);
 
-                  {tables.map((table) => {
-                    const colors = getStatusColors(table.status);
-
-                    return (
-                      <button
-                        key={table.id}
-                        type="button"
-                        onPointerDown={(e) => handlePointerDown(e, table)}
-                        onPointerMove={(e) => handlePointerMove(e, table)}
-                        onPointerUp={(e) => handlePointerUp(e, table)}
-                        onPointerCancel={(e) => handlePointerCancel(e, table)}
+                  return (
+                    <button
+                      key={table.id}
+                      type="button"
+                      onPointerDown={(e) => handlePointerDown(e, table)}
+                      onPointerMove={(e) => handlePointerMove(e, table)}
+                      onPointerUp={(e) => handlePointerUp(e, table)}
+                      onPointerCancel={(e) => handlePointerCancel(e, table)}
+                      style={{
+                        position: 'absolute',
+                        left: table.x,
+                        top: table.y,
+                        width: TABLE_WIDTH,
+                        height: TABLE_HEIGHT,
+                        borderRadius: 6,
+                        border: `2px solid ${colors.border}`,
+                        background: colors.bg,
+                        color: colors.text,
+                        cursor: 'grab',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        userSelect: 'none',
+                        touchAction: 'none',
+                        padding: 2,
+                        zIndex: 3,
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.10)',
+                        overflow: 'hidden',
+                      }}
+                      title={`${table.name} - ${table.status}`}
+                    >
+                      <span
                         style={{
-                          position: 'absolute',
-                          left: table.x,
-                          top: table.y,
-                          width: TABLE_WIDTH,
-                          height: TABLE_HEIGHT,
-                          borderRadius: 6,
-                          border: `2px solid ${colors.border}`,
-                          background: colors.bg,
-                          color: colors.text,
-                          cursor: 'grab',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          userSelect: 'none',
-                          touchAction: 'none',
-                          padding: 2,
-                          zIndex: 3,
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.10)',
+                          display: 'block',
+                          width: '100%',
+                          maxWidth: '100%',
                           overflow: 'hidden',
+                          whiteSpace: 'nowrap',
+                          textOverflow: 'ellipsis',
+                          fontWeight: 800,
+                          fontSize: 7,
+                          lineHeight: 1,
+                          textAlign: 'center',
                         }}
-                        title={`${table.name} - ${table.status}`}
                       >
-                        <span
-                          style={{
-                            display: 'block',
-                            width: '100%',
-                            maxWidth: '100%',
-                            overflow: 'hidden',
-                            whiteSpace: 'nowrap',
-                            textOverflow: 'ellipsis',
-                            fontWeight: 800,
-                            fontSize: 7,
-                            lineHeight: 1,
-                            textAlign: 'center',
-                          }}
-                        >
-                          {table.name}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+                        {table.name}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
-            </>
+            </div>
           )}
         </section>
 
