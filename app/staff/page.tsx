@@ -632,137 +632,118 @@ export default function StaffPage() {
                 const colors = getStatusColors(table.status);
 
                 return (
-                  <div
-                    key={table.id}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr auto auto',
-                      gap: 8,
-                      alignItems: 'center',
-                    }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => router.push(`/staff/table/${table.id}`)}
-                      style={{
-                        gridColumn: isMobile ? '1 / -1' : 'auto',
-                        width: '100%',
-                        padding: '10px 12px',
-                        borderRadius: 10,
-                        border: `2px solid ${colors.border}`,
-                        background: colors.bg,
-                        color: colors.text,
-                        fontWeight: 800,
-                        fontSize: 14,
-                        textAlign: 'left',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {table.name} · {table.status}
-                    </button>
+                <div
+  key={table.id}
+  style={{
+    display: 'grid',
+    gridTemplateColumns: isMobile ? '1fr auto' : '1fr auto',
+    gap: 8,
+    alignItems: 'center',
+  }}
+>
+  <button
+    type="button"
+    onClick={(e) => {
+      e.stopPropagation();
+      setStatusMenuTableId((prev) => (prev === table.id ? null : table.id));
+    }}
+    style={{
+      width: '100%',
+      padding: '10px 12px',
+      borderRadius: 10,
+      border: `2px solid ${colors.border}`,
+      background: colors.bg,
+      color: colors.text,
+      fontWeight: 800,
+      fontSize: 14,
+      textAlign: 'left',
+      cursor: 'pointer',
+    }}
+  >
+    {table.name} · {table.status}
+  </button>
 
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setStatusMenuTableId((prev) =>
-                          prev === table.id ? null : table.id
-                        );
-                      }}
-                      style={{
-                        padding: '10px 12px',
-                        borderRadius: 10,
-                        border: '1px solid #ccc',
-                        background: '#fff',
-                        color: '#111',
-                        cursor: 'pointer',
-                        fontWeight: 700,
-                        fontSize: 12,
-                      }}
-                    >
-                      Stato
-                    </button>
+  <button
+    type="button"
+    onClick={() => router.push(`/staff/table/${table.id}`)}
+    style={{
+      padding: '10px 12px',
+      borderRadius: 10,
+      border: '1px solid #111',
+      background: '#111',
+      color: '#fff',
+      cursor: 'pointer',
+      fontWeight: 700,
+      fontSize: 12,
+      whiteSpace: 'nowrap',
+    }}
+  >
+    Ordine
+  </button>
 
-                    <button
-                      type="button"
-                      onClick={() => router.push(`/staff/table/${table.id}`)}
-                      style={{
-                        padding: '10px 12px',
-                        borderRadius: 10,
-                        border: '1px solid #111',
-                        background: '#111',
-                        color: '#fff',
-                        cursor: 'pointer',
-                        fontWeight: 700,
-                        fontSize: 12,
-                      }}
-                    >
-                      Ordine
-                    </button>
+  {statusMenuTableId === table.id && (
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        gridColumn: '1 / -1',
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+        gap: 8,
+        padding: 8,
+        borderRadius: 10,
+        background: '#fff',
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => handleChangeStatus(table.id, 'libero')}
+        style={{
+          padding: '10px 12px',
+          borderRadius: 8,
+          border: '2px solid #16a34a',
+          background: '#dcfce7',
+          color: '#166534',
+          fontWeight: 700,
+          cursor: 'pointer',
+        }}
+      >
+        Libero
+      </button>
 
-                    {statusMenuTableId === table.id && (
-                      <div
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                          gridColumn: '1 / -1',
-                          display: 'grid',
-                          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
-                          gap: 8,
-                          padding: 8,
-                          borderRadius: 10,
-                          background: '#fff',
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => handleChangeStatus(table.id, 'libero')}
-                          style={{
-                            padding: '10px 12px',
-                            borderRadius: 8,
-                            border: '2px solid #16a34a',
-                            background: '#dcfce7',
-                            color: '#166534',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Libero
-                        </button>
+      <button
+        type="button"
+        onClick={() => handleChangeStatus(table.id, 'prenotato')}
+        style={{
+          padding: '10px 12px',
+          borderRadius: 8,
+          border: '2px solid #ea580c',
+          background: '#fed7aa',
+          color: '#9a3412',
+          fontWeight: 700,
+          cursor: 'pointer',
+        }}
+      >
+        Prenotato
+      </button>
 
-                        <button
-                          type="button"
-                          onClick={() => handleChangeStatus(table.id, 'prenotato')}
-                          style={{
-                            padding: '10px 12px',
-                            borderRadius: 8,
-                            border: '2px solid #ea580c',
-                            background: '#fed7aa',
-                            color: '#9a3412',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Prenotato
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleChangeStatus(table.id, 'occupato')}
-                          style={{
-                            padding: '10px 12px',
-                            borderRadius: 8,
-                            border: '2px solid #dc2626',
-                            background: '#fee2e2',
-                            color: '#991b1b',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Occupato
-                        </button>
-                      </div>
-                    )}
-                  </div>
+      <button
+        type="button"
+        onClick={() => handleChangeStatus(table.id, 'occupato')}
+        style={{
+          padding: '10px 12px',
+          borderRadius: 8,
+          border: '2px solid #dc2626',
+          background: '#fee2e2',
+          color: '#991b1b',
+          fontWeight: 700,
+          cursor: 'pointer',
+        }}
+      >
+        Occupato
+      </button>
+    </div>
+  )}
+</div>
                 );
               })}
 
