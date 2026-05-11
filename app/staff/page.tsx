@@ -34,7 +34,8 @@ export default function StaffPage() {
   const [search, setSearch] = useState('');
   const [newTableName, setNewTableName] = useState('');
   const [statusMenuTableId, setStatusMenuTableId] = useState<string | null>(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
 
   const dragStateRef = useRef<{
     tableId: string | null;
@@ -66,6 +67,20 @@ export default function StaffPage() {
     const closeMenus = () => setStatusMenuTableId(null);
     window.addEventListener('click', closeMenus);
     return () => window.removeEventListener('click', closeMenus);
+  }, []);
+
+  useEffect(() => {
+    const onResize = () => {
+      const mobile = window.innerWidth < 960;
+      setIsMobile(mobile);
+      if (!mobile) {
+        setMenuOpen(true);
+      }
+    };
+
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, []);
 
   async function loadTables() {
@@ -309,7 +324,7 @@ export default function StaffPage() {
         minHeight: '100vh',
         background: '#f5f5f5',
         color: '#111',
-        padding: 12,
+        padding: isMobile ? 8 : 12,
       }}
     >
       <div
@@ -317,7 +332,9 @@ export default function StaffPage() {
           maxWidth: 1450,
           margin: '0 auto',
           display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1.35fr) minmax(320px, 0.65fr)',
+          gridTemplateColumns: isMobile
+            ? '1fr'
+            : 'minmax(0, 1.35fr) minmax(320px, 0.65fr)',
           gap: 12,
         }}
       >
@@ -326,8 +343,9 @@ export default function StaffPage() {
             background: '#fff',
             border: '1px solid #ddd',
             borderRadius: 14,
-            padding: 12,
+            padding: isMobile ? 8 : 12,
             overflow: 'hidden',
+            order: 1,
           }}
         >
           <div
@@ -341,34 +359,38 @@ export default function StaffPage() {
             }}
           >
             <div>
-              <h1 style={{ margin: 0, fontSize: 24 }}>Gestione tavoli</h1>
+              <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 24 }}>
+                Gestione tavoli
+              </h1>
               <p style={{ margin: '4px 0 0 0', fontSize: 13, color: '#666' }}>
                 Tocca un tavolo per aprire l’ordine, trascinalo per spostarlo.
               </p>
             </div>
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                onClick={() => setMobileMenuOpen((prev) => !prev)}
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                  border: '1px solid #ccc',
-                  background: '#fff',
-                  color: '#111',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                }}
-              >
-                {mobileMenuOpen ? 'Nascondi menù' : 'Mostra menù'}
-              </button>
+              {isMobile && (
+                <button
+                  type="button"
+                  onClick={() => setMenuOpen((prev) => !prev)}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    border: '1px solid #ccc',
+                    background: '#fff',
+                    color: '#111',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                  }}
+                >
+                  {menuOpen ? 'Nascondi menù' : 'Mostra menù'}
+                </button>
+              )}
 
               <button
                 type="button"
                 onClick={() => router.push('/')}
                 style={{
-                  padding: '8px 12px',
+                  padding: '10px 12px',
                   borderRadius: 8,
                   border: '1px solid #ccc',
                   background: '#fff',
@@ -389,8 +411,8 @@ export default function StaffPage() {
               overflow: 'auto',
               borderRadius: 12,
               border: '1px solid #cbd5e1',
-              backgroundColor: '#f8fafc',
-              minHeight: 640,
+              background: '#f8fafc',
+              minHeight: isMobile ? 420 : 640,
             }}
           >
             <div
@@ -398,17 +420,38 @@ export default function StaffPage() {
                 position: 'relative',
                 width: MAP_WIDTH,
                 height: MAP_HEIGHT,
-                backgroundImage: `
-                  linear-gradient(to right, rgba(100,116,139,0.08) 1px, transparent 1px),
-                  linear-gradient(to bottom, rgba(100,116,139,0.08) 1px, transparent 1px),
-                  url('/piantina-nur.jpeg')
-                `,
-                backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px, ${GRID_SIZE}px ${GRID_SIZE}px, contain`,
-                backgroundRepeat: 'repeat, repeat, no-repeat',
-                backgroundPosition: '0 0, 0 0, center center',
-                touchAction: 'none',
+                background: '#ffffff',
               }}
             >
+              <img
+                src="/piantina-nur.jpeg"
+                alt="Piantina locale NUR"
+                draggable={false}
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  pointerEvents: 'none',
+                  zIndex: 1,
+                }}
+              />
+
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundImage: `
+                    linear-gradient(to right, rgba(100,116,139,0.08) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(100,116,139,0.08) 1px, transparent 1px)
+                  `,
+                  backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
+                  pointerEvents: 'none',
+                  zIndex: 2,
+                }}
+              />
+
               {tables.map((table) => {
                 const colors = getStatusColors(table.status);
 
@@ -441,6 +484,7 @@ export default function StaffPage() {
                       userSelect: 'none',
                       touchAction: 'none',
                       padding: 4,
+                      zIndex: 3,
                     }}
                     title={`${table.name} - ${table.status}`}
                   >
@@ -452,16 +496,17 @@ export default function StaffPage() {
           </div>
         </section>
 
-        {mobileMenuOpen && (
+        {(!isMobile || menuOpen) && (
           <aside
             style={{
               background: '#fff',
               border: '1px solid #ddd',
               borderRadius: 14,
-              padding: 12,
+              padding: isMobile ? 8 : 12,
               display: 'flex',
               flexDirection: 'column',
               gap: 12,
+              order: 2,
             }}
           >
             <section
@@ -472,7 +517,9 @@ export default function StaffPage() {
                 background: '#fafafa',
               }}
             >
-              <h2 style={{ margin: '0 0 8px 0', fontSize: 16 }}>Aggiungi tavolo</h2>
+              <h2 style={{ margin: '0 0 8px 0', fontSize: 16 }}>
+                Aggiungi tavolo
+              </h2>
 
               <div style={{ display: 'flex', gap: 8 }}>
                 <input
@@ -483,7 +530,7 @@ export default function StaffPage() {
                   style={{
                     flex: 1,
                     minWidth: 0,
-                    padding: '8px 10px',
+                    padding: '10px 12px',
                     borderRadius: 8,
                     border: '1px solid #ccc',
                     fontSize: 14,
@@ -493,7 +540,7 @@ export default function StaffPage() {
                   type="button"
                   onClick={handleAddTable}
                   style={{
-                    padding: '8px 12px',
+                    padding: '10px 12px',
                     borderRadius: 8,
                     border: 'none',
                     background: '#111',
@@ -523,7 +570,7 @@ export default function StaffPage() {
                 placeholder="Es. T1, Banco..."
                 style={{
                   width: '100%',
-                  padding: '8px 10px',
+                  padding: '10px 12px',
                   borderRadius: 8,
                   border: '1px solid #ccc',
                   fontSize: 14,
@@ -537,7 +584,6 @@ export default function StaffPage() {
                 borderRadius: 12,
                 padding: 10,
                 background: '#fafafa',
-                minHeight: 220,
               }}
             >
               <div
@@ -564,7 +610,7 @@ export default function StaffPage() {
                       key={table.id}
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: '1fr auto auto',
+                        gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr auto auto',
                         gap: 8,
                         alignItems: 'center',
                       }}
@@ -573,6 +619,7 @@ export default function StaffPage() {
                         type="button"
                         onClick={() => router.push(`/staff/table/${table.id}`)}
                         style={{
+                          gridColumn: isMobile ? '1 / -1' : 'auto',
                           width: '100%',
                           padding: '10px 12px',
                           borderRadius: 10,
@@ -633,7 +680,7 @@ export default function StaffPage() {
                           style={{
                             gridColumn: '1 / -1',
                             display: 'grid',
-                            gridTemplateColumns: 'repeat(3, 1fr)',
+                            gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
                             gap: 8,
                             padding: 8,
                             borderRadius: 10,
@@ -645,7 +692,7 @@ export default function StaffPage() {
                             type="button"
                             onClick={() => handleChangeStatus(table.id, 'libero')}
                             style={{
-                              padding: '8px 10px',
+                              padding: '10px 12px',
                               borderRadius: 8,
                               border: '2px solid #16a34a',
                               background: '#dcfce7',
@@ -659,11 +706,9 @@ export default function StaffPage() {
 
                           <button
                             type="button"
-                            onClick={() =>
-                              handleChangeStatus(table.id, 'prenotato')
-                            }
+                            onClick={() => handleChangeStatus(table.id, 'prenotato')}
                             style={{
-                              padding: '8px 10px',
+                              padding: '10px 12px',
                               borderRadius: 8,
                               border: '2px solid #ea580c',
                               background: '#fed7aa',
@@ -679,7 +724,7 @@ export default function StaffPage() {
                             type="button"
                             onClick={() => handleChangeStatus(table.id, 'occupato')}
                             style={{
-                              padding: '8px 10px',
+                              padding: '10px 12px',
                               borderRadius: 8,
                               border: '2px solid #dc2626',
                               background: '#fee2e2',
