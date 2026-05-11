@@ -55,18 +55,16 @@ const DEFAULT_OWNER_USERNAME = 'Franco';
 const DEFAULT_OWNER_PASSWORD = '0000';
 
 const CATEGORY_PRESET_COLORS = [
-  '#111111',
-  '#dc2626',
-  '#ea580c',
-  '#d97706',
-  '#65a30d',
-  '#059669',
-  '#0891b2',
-  '#2563eb',
-  '#7c3aed',
-  '#c026d3',
-  '#be123c',
-  '#6b4f3a',
+  '#111111', // nero
+  '#dc2626', // rosso
+  '#f59e0b', // giallo/arancio forte
+  '#16a34a', // verde
+  '#2563eb', // blu
+  '#7c3aed', // viola
+  '#db2777', // fucsia
+  '#ea580c', // arancione
+  '#0891b2', // turchese
+  '#6b4f3a', // marrone
 ];
 
 const DEFAULT_CATEGORY_COLOR = '#111111';
