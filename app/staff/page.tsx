@@ -26,6 +26,13 @@ const TABLE_WIDTH = 34;
 const TABLE_HEIGHT = 34;
 const DRAG_THRESHOLD = 8;
 
+const FLOOR_ROTATION = -44;
+const FLOOR_SCALE = 0.97;
+const FLOOR_OFFSET_X = -33;
+const FLOOR_OFFSET_Y = -9;
+
+const MAP_CLIP_PATH = 'inset(6% 7% 8% 7% round 12px)';
+
 export default function StaffPage() {
   const router = useRouter();
 
@@ -36,11 +43,6 @@ export default function StaffPage() {
   const [statusMenuTableId, setStatusMenuTableId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [showMap, setShowMap] = useState(true);
-
-  const [floorRotation, setFloorRotation] = useState(-44);
-  const [floorScale, setFloorScale] = useState(0.9);
-  const [floorOffsetX, setFloorOffsetX] = useState(-33);
-  const [floorOffsetY, setFloorOffsetY] = useState(-9);
 
   const dragStateRef = useRef<{
     tableId: string | null;
@@ -382,27 +384,6 @@ export default function StaffPage() {
 
               <button
                 type="button"
-                onClick={() => {
-                  setFloorRotation(-8);
-                  setFloorScale(1.18);
-                  setFloorOffsetX(0);
-                  setFloorOffsetY(-18);
-                }}
-                style={{
-                  padding: '10px 12px',
-                  borderRadius: 8,
-                  border: '1px solid #ccc',
-                  background: '#fff',
-                  color: '#111',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                }}
-              >
-                Reset mappa
-              </button>
-
-              <button
-                type="button"
                 onClick={() => router.push('/')}
                 style={{
                   padding: '10px 12px',
@@ -420,173 +401,112 @@ export default function StaffPage() {
           </div>
 
           {showMap && (
-            <>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, minmax(0, 1fr))',
-                  gap: 10,
-                  marginBottom: 10,
-                  background: '#fafafa',
-                  borderRadius: 12,
-                  padding: 10,
-                }}
-              >
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
-                  Rotazione: {floorRotation}°
-                  <input
-                    type="range"
-                    min={-20}
-                    max={20}
-                    step={1}
-                    value={floorRotation}
-                    onChange={(e) => setFloorRotation(Number(e.target.value))}
-                  />
-                </label>
-
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
-                  Zoom: {floorScale.toFixed(2)}
-                  <input
-                    type="range"
-                    min={0.8}
-                    max={1.8}
-                    step={0.01}
-                    value={floorScale}
-                    onChange={(e) => setFloorScale(Number(e.target.value))}
-                  />
-                </label>
-
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
-                  Sposta X: {floorOffsetX}px
-                  <input
-                    type="range"
-                    min={-220}
-                    max={220}
-                    step={1}
-                    value={floorOffsetX}
-                    onChange={(e) => setFloorOffsetX(Number(e.target.value))}
-                  />
-                </label>
-
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
-                  Sposta Y: {floorOffsetY}px
-                  <input
-                    type="range"
-                    min={-220}
-                    max={220}
-                    step={1}
-                    value={floorOffsetY}
-                    onChange={(e) => setFloorOffsetY(Number(e.target.value))}
-                  />
-                </label>
-              </div>
-
+            <div
+              style={{
+                position: 'relative',
+                width: '100%',
+                overflowX: 'auto',
+                overflowY: 'hidden',
+              }}
+            >
               <div
                 style={{
                   position: 'relative',
-                  width: '100%',
-                  overflowX: 'auto',
-                  overflowY: 'hidden',
+                  width: MAP_WIDTH,
+                  height: MAP_HEIGHT,
+                  overflow: 'hidden',
+                  borderRadius: 12,
+                  background: '#eef6fb',
+                  clipPath: MAP_CLIP_PATH,
                 }}
               >
+                <img
+                  src="/piantina-nur.jpeg"
+                  alt="Piantina locale NUR"
+                  draggable={false}
+                  style={{
+                    position: 'absolute',
+                    left: '50%',
+                    top: '50%',
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    transform: `translate(calc(-50% + ${FLOOR_OFFSET_X}px), calc(-50% + ${FLOOR_OFFSET_Y}px)) rotate(${FLOOR_ROTATION}deg) scale(${FLOOR_SCALE})`,
+                    transformOrigin: 'center center',
+                    pointerEvents: 'none',
+                    zIndex: 1,
+                  }}
+                />
+
                 <div
                   style={{
-                    position: 'relative',
-                    width: MAP_WIDTH,
-                    height: MAP_HEIGHT,
-                    overflow: 'hidden',
-                    borderRadius: 12,
-                    background: '#eef6fb',
+                    position: 'absolute',
+                    inset: 0,
+                    backgroundImage: `
+                      linear-gradient(to right, rgba(100,116,139,0.07) 1px, transparent 1px),
+                      linear-gradient(to bottom, rgba(100,116,139,0.07) 1px, transparent 1px)
+                    `,
+                    backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
+                    pointerEvents: 'none',
+                    zIndex: 2,
                   }}
-                >
-                  <img
-                    src="/piantina-nur.jpeg"
-                    alt="Piantina locale NUR"
-                    draggable={false}
-                    style={{
-                      position: 'absolute',
-                      left: '50%',
-                      top: '50%',
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                      transform: `translate(calc(-50% + ${floorOffsetX}px), calc(-50% + ${floorOffsetY}px)) rotate(${floorRotation}deg) scale(${floorScale})`,
-                      transformOrigin: 'center center',
-                      pointerEvents: 'none',
-                      zIndex: 1,
-                    }}
-                  />
+                />
 
-                  <div
-                    style={{
-                      position: 'absolute',
-                      inset: 0,
-                      backgroundImage: `
-                        linear-gradient(to right, rgba(100,116,139,0.07) 1px, transparent 1px),
-                        linear-gradient(to bottom, rgba(100,116,139,0.07) 1px, transparent 1px)
-                      `,
-                      backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
-                      pointerEvents: 'none',
-                      zIndex: 2,
-                    }}
-                  />
+                {tables.map((table) => {
+                  const colors = getStatusColors(table.status);
 
-                  {tables.map((table) => {
-                    const colors = getStatusColors(table.status);
-
-                    return (
-                      <button
-                        key={table.id}
-                        type="button"
-                        onPointerDown={(e) => handlePointerDown(e, table)}
-                        onPointerMove={(e) => handlePointerMove(e, table)}
-                        onPointerUp={(e) => handlePointerUp(e, table)}
-                        onPointerCancel={(e) => handlePointerCancel(e, table)}
+                  return (
+                    <button
+                      key={table.id}
+                      type="button"
+                      onPointerDown={(e) => handlePointerDown(e, table)}
+                      onPointerMove={(e) => handlePointerMove(e, table)}
+                      onPointerUp={(e) => handlePointerUp(e, table)}
+                      onPointerCancel={(e) => handlePointerCancel(e, table)}
+                      style={{
+                        position: 'absolute',
+                        left: table.x,
+                        top: table.y,
+                        width: TABLE_WIDTH,
+                        height: TABLE_HEIGHT,
+                        borderRadius: 6,
+                        border: `2px solid ${colors.border}`,
+                        background: colors.bg,
+                        color: colors.text,
+                        cursor: 'grab',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        userSelect: 'none',
+                        touchAction: 'none',
+                        padding: 2,
+                        zIndex: 3,
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.10)',
+                        overflow: 'hidden',
+                      }}
+                      title={`${table.name} - ${table.status}`}
+                    >
+                      <span
                         style={{
-                          position: 'absolute',
-                          left: table.x,
-                          top: table.y,
-                          width: TABLE_WIDTH,
-                          height: TABLE_HEIGHT,
-                          borderRadius: 6,
-                          border: `2px solid ${colors.border}`,
-                          background: colors.bg,
-                          color: colors.text,
-                          cursor: 'grab',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          userSelect: 'none',
-                          touchAction: 'none',
-                          padding: 2,
-                          zIndex: 3,
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.10)',
+                          display: 'block',
+                          width: '100%',
+                          maxWidth: '100%',
                           overflow: 'hidden',
+                          whiteSpace: 'nowrap',
+                          textOverflow: 'ellipsis',
+                          fontWeight: 800,
+                          fontSize: 7,
+                          lineHeight: 1,
+                          textAlign: 'center',
                         }}
-                        title={`${table.name} - ${table.status}`}
                       >
-                        <span
-                          style={{
-                            display: 'block',
-                            width: '100%',
-                            maxWidth: '100%',
-                            overflow: 'hidden',
-                            whiteSpace: 'nowrap',
-                            textOverflow: 'ellipsis',
-                            fontWeight: 800,
-                            fontSize: 7,
-                            lineHeight: 1,
-                            textAlign: 'center',
-                          }}
-                        >
-                          {table.name}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+                        {table.name}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
-            </>
+            </div>
           )}
         </section>
 
