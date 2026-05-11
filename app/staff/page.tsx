@@ -22,8 +22,8 @@ type TableRow = {
 const GRID_SIZE = 20;
 const MAP_WIDTH = 980;
 const MAP_HEIGHT = 620;
-const TABLE_WIDTH = 35;
-const TABLE_HEIGHT = 35;
+const TABLE_WIDTH = 38;
+const TABLE_HEIGHT = 38;
 const DRAG_THRESHOLD = 8;
 
 const FLOOR_ROTATION = -44;
