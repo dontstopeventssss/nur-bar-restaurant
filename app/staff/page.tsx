@@ -401,7 +401,7 @@ export default function StaffPage() {
                 backgroundImage: `
                   linear-gradient(to right, rgba(100,116,139,0.08) 1px, transparent 1px),
                   linear-gradient(to bottom, rgba(100,116,139,0.08) 1px, transparent 1px),
-                  url('/piantina-nur.jpg')
+                  url('/piantina-nur.jpeg')
                 `,
                 backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px, ${GRID_SIZE}px ${GRID_SIZE}px, contain`,
                 backgroundRepeat: 'repeat, repeat, no-repeat',
