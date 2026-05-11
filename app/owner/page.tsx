@@ -55,16 +55,16 @@ const DEFAULT_OWNER_USERNAME = 'Franco';
 const DEFAULT_OWNER_PASSWORD = '0000';
 
 const CATEGORY_PRESET_COLORS = [
-  '#111111', // nero
-  '#dc2626', // rosso
-  '#f59e0b', // giallo/arancio forte
-  '#16a34a', // verde
-  '#2563eb', // blu
-  '#7c3aed', // viola
-  '#db2777', // fucsia
-  '#ea580c', // arancione
-  '#0891b2', // turchese
-  '#6b4f3a', // marrone
+  '#111111',
+  '#dc2626',
+  '#f59e0b',
+  '#16a34a',
+  '#2563eb',
+  '#7c3aed',
+  '#db2777',
+  '#ea580c',
+  '#0891b2',
+  '#6b4f3a',
 ];
 
 const DEFAULT_CATEGORY_COLOR = '#111111';
@@ -649,6 +649,7 @@ export default function OwnerPage() {
         gridTemplateColumns: '1fr 1fr',
         gap: 6,
         width: '100%',
+        minWidth: 0,
       }}
     >
       <button
@@ -664,6 +665,7 @@ export default function OwnerPage() {
           fontSize: 11,
           cursor: 'pointer',
           minHeight: 34,
+          minWidth: 0,
         }}
       >
         BAR
@@ -681,6 +683,7 @@ export default function OwnerPage() {
           fontSize: 11,
           cursor: 'pointer',
           minHeight: 34,
+          minWidth: 0,
         }}
       >
         CUCINA
@@ -694,7 +697,7 @@ export default function OwnerPage() {
         <div style={styles.loginCard}>
           <h1 style={styles.title}>Accesso Owner</h1>
           <p style={styles.subtitle}>
-            Inserisci credenziali per entrare nell'area amministrazione
+            Inserisci credenziali per entrare nell&apos;area amministrazione
           </p>
 
           <div style={styles.formGrid}>
@@ -775,7 +778,7 @@ export default function OwnerPage() {
         <div
           style={{
             ...styles.layout,
-            gridTemplateColumns: isMobile ? '1fr' : '290px 1fr',
+            gridTemplateColumns: isMobile ? '1fr' : '290px minmax(0, 1fr)',
           }}
         >
           <section style={styles.leftColumn}>
@@ -862,6 +865,7 @@ export default function OwnerPage() {
                             border: selected ? '3px solid #111' : '1px solid #d1d5db',
                             backgroundColor: color,
                             cursor: 'pointer',
+                            minWidth: 0,
                           }}
                         />
                       );
@@ -874,6 +878,7 @@ export default function OwnerPage() {
                       display: 'flex',
                       alignItems: 'center',
                       gap: 8,
+                      minWidth: 0,
                     }}
                   >
                     <div
@@ -886,7 +891,13 @@ export default function OwnerPage() {
                         flexShrink: 0,
                       }}
                     />
-                    <span style={{ fontSize: 12, color: '#444' }}>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        color: '#444',
+                        overflowWrap: 'anywhere',
+                      }}
+                    >
                       {newCategoryColor}
                     </span>
                   </div>
@@ -907,11 +918,9 @@ export default function OwnerPage() {
                   onClick={() => setSelectedCategoryFilter('all')}
                   style={{
                     ...styles.categoryLineButton,
-                    backgroundColor:
-                      selectedCategoryFilter === 'all' ? '#111' : '#fff',
+                    backgroundColor: selectedCategoryFilter === 'all' ? '#111' : '#fff',
                     color: selectedCategoryFilter === 'all' ? '#fff' : '#111',
-                    borderColor:
-                      selectedCategoryFilter === 'all' ? '#111' : '#ddd',
+                    borderColor: selectedCategoryFilter === 'all' ? '#111' : '#ddd',
                   }}
                 >
                   Tutte le categorie
@@ -933,6 +942,7 @@ export default function OwnerPage() {
                         style={{
                           ...styles.categoryLineButton,
                           flex: 1,
+                          minWidth: 0,
                           backgroundColor: active ? categoryColor : '#fff',
                           color: active ? '#fff' : '#111',
                           borderColor: active ? categoryColor : '#ddd',
@@ -944,6 +954,7 @@ export default function OwnerPage() {
                             alignItems: 'center',
                             gap: 8,
                             flexWrap: 'wrap',
+                            minWidth: 0,
                           }}
                         >
                           <span
@@ -954,9 +965,10 @@ export default function OwnerPage() {
                               backgroundColor: categoryColor,
                               display: 'inline-block',
                               border: '1px solid rgba(0,0,0,0.15)',
+                              flexShrink: 0,
                             }}
                           />
-                          <span>
+                          <span style={{ overflowWrap: 'anywhere' }}>
                             {category.name} ({count})
                           </span>
                         </span>
@@ -1122,9 +1134,10 @@ export default function OwnerPage() {
                                     alignItems: 'center',
                                     gap: 6,
                                     flexWrap: 'wrap',
+                                    minWidth: 0,
                                   }}
                                 >
-                                  <span>{item.name}</span>
+                                  <span style={{ overflowWrap: 'anywhere' }}>{item.name}</span>
                                   {item.is_fuori_menu && (
                                     <span
                                       style={{
@@ -1390,9 +1403,12 @@ export default function OwnerPage() {
                                 alignItems: 'center',
                                 gap: 6,
                                 flexWrap: 'wrap',
+                                minWidth: 0,
                               }}
                             >
-                              <span>{row.item_name}</span>
+                              <span style={{ overflowWrap: 'anywhere' }}>
+                                {row.item_name}
+                              </span>
                               {row.is_fuori_menu && (
                                 <span
                                   style={{
@@ -1432,11 +1448,14 @@ export default function OwnerPage() {
 const styles: Record<string, React.CSSProperties> = {
   pageWrap: {
     padding: 10,
+    width: '100%',
     maxWidth: 1100,
     margin: '0 auto',
     backgroundColor: '#f5f5f5',
     minHeight: '100vh',
     color: '#111',
+    overflowX: 'hidden',
+    boxSizing: 'border-box',
   },
   loginPage: {
     minHeight: '100vh',
@@ -1445,6 +1464,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     backgroundColor: '#f5f5f5',
     padding: 14,
+    boxSizing: 'border-box',
   },
   loginCard: {
     width: '100%',
@@ -1453,6 +1473,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid #ddd',
     borderRadius: 10,
     padding: 14,
+    boxSizing: 'border-box',
   },
   topBar: {
     display: 'flex',
@@ -1461,6 +1482,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 10,
     marginBottom: 10,
     flexWrap: 'wrap',
+    minWidth: 0,
   },
   title: {
     fontSize: 22,
@@ -1476,28 +1498,37 @@ const styles: Record<string, React.CSSProperties> = {
   layout: {
     display: 'grid',
     gap: 10,
+    minWidth: 0,
   },
   leftColumn: {
     display: 'flex',
     flexDirection: 'column',
     gap: 10,
+    minWidth: 0,
   },
   rightColumn: {
     display: 'flex',
     flexDirection: 'column',
     gap: 10,
+    minWidth: 0,
   },
   card: {
     backgroundColor: '#fff',
     border: '1px solid #ddd',
     borderRadius: 8,
     padding: 10,
+    minWidth: 0,
+    maxWidth: '100%',
+    boxSizing: 'border-box',
   },
   cardCompact: {
     backgroundColor: '#fff',
     border: '1px solid #ddd',
     borderRadius: 8,
     padding: 8,
+    minWidth: 0,
+    maxWidth: '100%',
+    boxSizing: 'border-box',
   },
   accordionButton: {
     width: '100%',
@@ -1511,6 +1542,8 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 13,
     fontWeight: 700,
     cursor: 'pointer',
+    minWidth: 0,
+    boxSizing: 'border-box',
   },
   sectionTitle: {
     fontSize: 15,
@@ -1520,11 +1553,13 @@ const styles: Record<string, React.CSSProperties> = {
   formGrid: {
     display: 'grid',
     gap: 8,
+    minWidth: 0,
   },
   formColumnTight: {
     display: 'flex',
     flexDirection: 'column',
     gap: 6,
+    minWidth: 0,
   },
   input: {
     width: '100%',
@@ -1535,6 +1570,8 @@ const styles: Record<string, React.CSSProperties> = {
     backgroundColor: '#fff',
     color: '#111',
     minHeight: 32,
+    minWidth: 0,
+    boxSizing: 'border-box',
   },
   textarea: {
     width: '100%',
@@ -1548,6 +1585,8 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#111',
     fontFamily: 'inherit',
     lineHeight: 1.4,
+    minWidth: 0,
+    boxSizing: 'border-box',
   },
   textareaSmall: {
     width: '100%',
@@ -1561,6 +1600,8 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#111',
     fontFamily: 'inherit',
     lineHeight: 1.4,
+    minWidth: 0,
+    boxSizing: 'border-box',
   },
   descriptionPreview: {
     maxWidth: 260,
@@ -1568,6 +1609,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#444',
     lineHeight: 1.35,
     whiteSpace: 'normal',
+    overflowWrap: 'anywhere',
   },
   label: {
     display: 'block',
@@ -1587,6 +1629,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 13,
     fontWeight: 600,
     minHeight: 34,
+    boxSizing: 'border-box',
   },
   secondaryButton: {
     padding: '7px 10px',
@@ -1597,6 +1640,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontSize: 13,
     minHeight: 34,
+    boxSizing: 'border-box',
   },
   secondaryButtonWide: {
     width: '100%',
@@ -1608,6 +1652,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontSize: 13,
     minHeight: 34,
+    boxSizing: 'border-box',
   },
   secondaryButtonHalf: {
     flex: 1,
@@ -1620,6 +1665,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontSize: 12,
     minHeight: 34,
+    boxSizing: 'border-box',
   },
   primaryButtonMini: {
     padding: '5px 7px',
@@ -1630,6 +1676,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontSize: 11,
     minHeight: 28,
+    boxSizing: 'border-box',
   },
   primaryButtonMiniWide: {
     width: '100%',
@@ -1641,6 +1688,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontSize: 11,
     minHeight: 28,
+    boxSizing: 'border-box',
   },
   secondaryButtonMini: {
     padding: '5px 7px',
@@ -1651,6 +1699,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontSize: 11,
     minHeight: 28,
+    boxSizing: 'border-box',
   },
   secondaryButtonMiniWide: {
     width: '100%',
@@ -1662,6 +1711,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontSize: 11,
     minHeight: 28,
+    boxSizing: 'border-box',
   },
   redButtonMini: {
     padding: '5px 8px',
@@ -1674,6 +1724,8 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     minHeight: 28,
     whiteSpace: 'nowrap',
+    flexShrink: 0,
+    boxSizing: 'border-box',
   },
   redButtonMiniWide: {
     width: '100%',
@@ -1686,6 +1738,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 11,
     fontWeight: 600,
     minHeight: 28,
+    boxSizing: 'border-box',
   },
   bigDangerButtonWide: {
     width: '100%',
@@ -1698,11 +1751,15 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 12,
     fontWeight: 700,
     minHeight: 38,
+    boxSizing: 'border-box',
   },
   categoryRowSingle: {
     display: 'flex',
     gap: 6,
-    alignItems: 'center',
+    alignItems: 'stretch',
+    minWidth: 0,
+    width: '100%',
+    flexWrap: 'nowrap',
   },
   categoryLineButton: {
     padding: '7px 9px',
@@ -1714,6 +1771,10 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'left',
     fontSize: 12,
     minHeight: 34,
+    minWidth: 0,
+    width: '100%',
+    boxSizing: 'border-box',
+    overflowWrap: 'anywhere',
   },
   productsHeader: {
     display: 'flex',
@@ -1722,6 +1783,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'flex-end',
     flexWrap: 'wrap',
     marginBottom: 8,
+    minWidth: 0,
   },
   productsHeaderMobile: {
     display: 'flex',
@@ -1729,18 +1791,21 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 8,
     alignItems: 'stretch',
     marginBottom: 8,
+    minWidth: 0,
   },
   reportControls: {
     display: 'flex',
     gap: 8,
     flexWrap: 'wrap',
     alignItems: 'center',
+    minWidth: 0,
   },
   reportControlsMobile: {
     display: 'flex',
     flexDirection: 'column',
     gap: 6,
     width: '100%',
+    minWidth: 0,
   },
   smallText: {
     fontSize: 11,
@@ -1751,6 +1816,7 @@ const styles: Record<string, React.CSSProperties> = {
   tableWrap: {
     overflowX: 'auto',
     WebkitOverflowScrolling: 'touch',
+    maxWidth: '100%',
   },
   table: {
     width: '100%',
@@ -1782,6 +1848,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 5,
     alignItems: 'center',
     flexWrap: 'wrap',
+    minWidth: 0,
   },
   actionsColumn: {
     display: 'flex',
@@ -1795,11 +1862,13 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 8,
     alignItems: 'center',
     flexWrap: 'wrap',
+    minWidth: 0,
   },
   topButtonsMobile: {
     display: 'flex',
     gap: 6,
     width: '100%',
+    minWidth: 0,
   },
   stackButtonsCompact: {
     marginTop: 10,
@@ -1807,5 +1876,6 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: 6,
     width: '100%',
+    minWidth: 0,
   },
 };
