@@ -26,11 +26,13 @@ const TABLE_WIDTH = 35;
 const TABLE_HEIGHT = 35;
 const DRAG_THRESHOLD = 8;
 
+// Parametri mappa / piantina
 const FLOOR_ROTATION = -44;
 const FLOOR_SCALE = 0.97;
 const FLOOR_OFFSET_X = -33;
 const FLOOR_OFFSET_Y = -9;
 
+// Clip percentuali sull'immagine (zona utile logica)
 const CLIP_TOP = 31;
 const CLIP_RIGHT = 15;
 const CLIP_BOTTOM = 23;
@@ -47,6 +49,7 @@ export default function StaffPage() {
   const [isMobile, setIsMobile] = useState(false);
   const [showMap, setShowMap] = useState(true);
 
+  // Stato drag in memoria (non React state per evitare re-render ad ogni move)
   const dragStateRef = useRef<{
     tableId: string | null;
     pointerId: number | null;
@@ -68,6 +71,16 @@ export default function StaffPage() {
     liveX: 0,
     liveY: 0,
   });
+
+  // Bounds utili pre-calcolati in coordinate logiche
+  const PLAYABLE_MIN_X = Math.round((CLIP_LEFT / 100) * MAP_WIDTH);
+  const PLAYABLE_MAX_X = Math.round(
+    MAP_WIDTH - (CLIP_RIGHT / 100) * MAP_WIDTH - TABLE_WIDTH
+  );
+  const PLAYABLE_MIN_Y = Math.round((CLIP_TOP / 100) * MAP_HEIGHT);
+  const PLAYABLE_MAX_Y = Math.round(
+    MAP_HEIGHT - (CLIP_BOTTOM / 100) * MAP_HEIGHT - TABLE_HEIGHT
+  );
 
   useEffect(() => {
     loadTables();
@@ -146,8 +159,9 @@ export default function StaffPage() {
       return;
     }
 
-    const startX = snapToGrid(Math.round((CLIP_LEFT / 100) * MAP_WIDTH) + 20);
-    const startY = snapToGrid(Math.round((CLIP_TOP / 100) * MAP_HEIGHT) + 20);
+    // Nuovo tavolo dentro la zona utile, con snap a griglia
+    const startX = snapToGrid(PLAYABLE_MIN_X + 20);
+    const startY = snapToGrid(PLAYABLE_MIN_Y + 20);
 
     const { data, error } = await supabase
       .from('tables')
@@ -250,17 +264,16 @@ export default function StaffPage() {
 
     if (!drag.moved) return;
 
-    const minX = Math.round((CLIP_LEFT / 100) * MAP_WIDTH);
-    const maxX = Math.round(
-      MAP_WIDTH - (CLIP_RIGHT / 100) * MAP_WIDTH - TABLE_WIDTH
+    const nextX = clamp(
+      snapToGrid(drag.startX + dx),
+      PLAYABLE_MIN_X,
+      PLAYABLE_MAX_X
     );
-    const minY = Math.round((CLIP_TOP / 100) * MAP_HEIGHT);
-    const maxY = Math.round(
-      MAP_HEIGHT - (CLIP_BOTTOM / 100) * MAP_HEIGHT - TABLE_HEIGHT
+    const nextY = clamp(
+      snapToGrid(drag.startY + dy),
+      PLAYABLE_MIN_Y,
+      PLAYABLE_MAX_Y
     );
-
-    const nextX = clamp(snapToGrid(drag.startX + dx), minX, maxX);
-    const nextY = clamp(snapToGrid(drag.startY + dy), minY, maxY);
 
     drag.liveX = nextX;
     drag.liveY = nextY;
@@ -285,6 +298,7 @@ export default function StaffPage() {
     if (drag.moved) {
       await persistTablePosition(table.id, drag.liveX, drag.liveY);
     } else {
+      // Click → apri ordine
       router.push(`/staff/table/${table.id}`);
     }
 
@@ -333,41 +347,30 @@ export default function StaffPage() {
     return tables.filter((table) => table.name.toLowerCase().includes(q));
   }, [tables, search]);
 
-  const visibleAreaStyle: React.CSSProperties = {
-    position: 'absolute',
-    left: `${CLIP_LEFT}%`,
-    top: `${CLIP_TOP}%`,
-    width: `${100 - CLIP_LEFT - CLIP_RIGHT}%`,
-    height: `${100 - CLIP_TOP - CLIP_BOTTOM}%`,
-    border: '2px dashed rgba(37, 99, 235, 0.20)',
-    borderRadius: 10,
-    pointerEvents: 'none',
-    zIndex: 2,
-  };
-
   return (
     <main
       style={{
         minHeight: '100vh',
         background: '#f5f5f5',
         color: '#111',
-        padding: isMobile ? 8 : 10,
+        padding: isMobile ? 6 : 8,
       }}
     >
       <div
         style={{
-          maxWidth: 1700,
+          maxWidth: 1780,
           margin: '0 auto',
           display: 'flex',
           flexDirection: 'column',
           gap: 10,
         }}
       >
+        {/* Sezione mappa / controlli principali */}
         <section
           style={{
             background: '#fff',
             borderRadius: 12,
-            padding: isMobile ? 8 : 10,
+            padding: isMobile ? 6 : 8,
           }}
         >
           <div
@@ -434,12 +437,13 @@ export default function StaffPage() {
                 style={{
                   position: 'relative',
                   width: '100%',
-                  maxWidth: 'min(96vw, 1600px)',
+                  maxWidth: isMobile ? '100%' : 1720,
                   aspectRatio: `${MAP_WIDTH} / ${MAP_HEIGHT}`,
                   margin: '0 auto',
                   overflow: 'hidden',
                   borderRadius: 12,
-                  background: '#eef6fb',
+                  background: '#f3f4f6',
+                  boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.05)',
                 }}
               >
                 <img
@@ -456,22 +460,6 @@ export default function StaffPage() {
                     transformOrigin: 'center center',
                     pointerEvents: 'none',
                     zIndex: 1,
-                  }}
-                />
-
-                <div style={visibleAreaStyle} />
-
-                <div
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    backgroundImage: `
-                      linear-gradient(to right, rgba(100,116,139,0.07) 1px, transparent 1px),
-                      linear-gradient(to bottom, rgba(100,116,139,0.07) 1px, transparent 1px)
-                    `,
-                    backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
-                    pointerEvents: 'none',
-                    zIndex: 2,
                   }}
                 />
 
@@ -538,6 +526,7 @@ export default function StaffPage() {
           )}
         </section>
 
+        {/* Box aggiungi + cerca + lista tavoli */}
         <section
           style={{
             background: '#fff',
@@ -716,7 +705,9 @@ export default function StaffPage() {
                         style={{
                           gridColumn: '1 / -1',
                           display: 'grid',
-                          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+                          gridTemplateColumns: isMobile
+                            ? '1fr'
+                            : 'repeat(3, 1fr)',
                           gap: 8,
                           padding: 8,
                           borderRadius: 10,
@@ -741,7 +732,9 @@ export default function StaffPage() {
 
                         <button
                           type="button"
-                          onClick={() => handleChangeStatus(table.id, 'prenotato')}
+                          onClick={() =>
+                            handleChangeStatus(table.id, 'prenotato')
+                          }
                           style={{
                             padding: '10px 12px',
                             borderRadius: 8,
@@ -757,7 +750,9 @@ export default function StaffPage() {
 
                         <button
                           type="button"
-                          onClick={() => handleChangeStatus(table.id, 'occupato')}
+                          onClick={() =>
+                            handleChangeStatus(table.id, 'occupato')
+                          }
                           style={{
                             padding: '10px 12px',
                             borderRadius: 8,
