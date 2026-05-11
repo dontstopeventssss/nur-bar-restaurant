@@ -466,39 +466,39 @@ export default function TableOrderPage() {
     }
   };
 
-  const handleDeleteOrderItem = async (menuItemId: string) => {
-    const existing = orderItems[menuItemId];
-    if (!existing) return;
+const handleDeleteOrderItem = async (menuItemId: string) => {
+  const existing = orderItems[menuItemId];
+  if (!existing) return;
 
-    setPendingItems((prev) => {
-      const copy = { ...prev };
-      delete copy[menuItemId];
-      return copy;
-    });
+  setPendingItems((prev) => {
+    const copy = { ...prev };
+    delete copy[menuItemId];
+    return copy;
+  });
 
-    if (existing.id) {
-      setSaving(true);
-      try {
-        const { error } = await supabase
-          .from('order_items')
-          .delete()
-          .eq('id', existing.id);
+  if (existing.id) {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('order_items')
+        .delete()
+        .eq('id', existing.id);
 
-        if (error) {
-          console.error('Errore eliminazione order_item', error);
-          return;
-        }
-      } finally {
-        setSaving(false);
+      if (error) {
+        console.error('Errore eliminazione order_item', error);
+        return;
       }
+    } finally {
+      setSaving(false);
     }
+  }
 
-    setOrderItems((prev) => {
-      const copy = { ...prev };
-      delete copy[item.id];
-      return copy;
-    });
-  };
+  setOrderItems((prev) => {
+    const copy = { ...prev };
+    delete copy[menuItemId];
+    return copy;
+  });
+};
 
   const handleCreateProduct = async () => {
     const name = newProductName.trim();
