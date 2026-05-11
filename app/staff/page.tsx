@@ -31,7 +31,12 @@ const FLOOR_SCALE = 0.97;
 const FLOOR_OFFSET_X = -33;
 const FLOOR_OFFSET_Y = -9;
 
-const MAP_CLIP_PATH = 'inset(31% 15% 23% 14% round 12px)';
+const CLIP_TOP = 31;
+const CLIP_RIGHT = 15;
+const CLIP_BOTTOM = 23;
+const CLIP_LEFT = 14;
+
+const MAP_CLIP_PATH = `inset(${CLIP_TOP}% ${CLIP_RIGHT}% ${CLIP_BOTTOM}% ${CLIP_LEFT}% round 12px)`;
 
 export default function StaffPage() {
   const router = useRouter();
@@ -244,11 +249,14 @@ export default function StaffPage() {
 
     if (!drag.moved) return;
 
-    const maxX = MAP_WIDTH - TABLE_WIDTH;
-    const maxY = MAP_HEIGHT - TABLE_HEIGHT;
+   const minX = Math.round((CLIP_LEFT / 100) * MAP_WIDTH);
+const maxX = Math.round(MAP_WIDTH - (CLIP_RIGHT / 100) * MAP_WIDTH - TABLE_WIDTH);
 
-    const nextX = clamp(snapToGrid(drag.startX + dx), 0, maxX);
-    const nextY = clamp(snapToGrid(drag.startY + dy), 0, maxY);
+const minY = Math.round((CLIP_TOP / 100) * MAP_HEIGHT);
+const maxY = Math.round(MAP_HEIGHT - (CLIP_BOTTOM / 100) * MAP_HEIGHT - TABLE_HEIGHT);
+
+const nextX = clamp(snapToGrid(drag.startX + dx), minX, maxX);
+const nextY = clamp(snapToGrid(drag.startY + dy), minY, maxY);
 
     drag.liveX = nextX;
     drag.liveY = nextY;
@@ -401,25 +409,24 @@ export default function StaffPage() {
           </div>
 
           {showMap && (
-            <div
-              style={{
-                position: 'relative',
-                width: '100%',
-                overflowX: 'auto',
-                overflowY: 'hidden',
-              }}
-            >
-              <div
-                style={{
-                  position: 'relative',
-                  width: MAP_WIDTH,
-                  height: MAP_HEIGHT,
-                  overflow: 'hidden',
-                  borderRadius: 12,
-                  background: '#eef6fb',
-                  clipPath: MAP_CLIP_PATH,
-                }}
-              >
+           <div
+  style={{
+    width: '100%',
+  }}
+>
+  <div
+    style={{
+      position: 'relative',
+      width: '100%',
+      maxWidth: 1320,
+      aspectRatio: `${MAP_WIDTH} / ${MAP_HEIGHT}`,
+      margin: '0 auto',
+      overflow: 'hidden',
+      borderRadius: 12,
+      background: '#eef6fb',
+      clipPath: MAP_CLIP_PATH,
+    }}
+  >
                 <img
                   src="/piantina-nur.jpeg"
                   alt="Piantina locale NUR"
