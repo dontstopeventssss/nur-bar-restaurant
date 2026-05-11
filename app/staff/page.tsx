@@ -347,7 +347,7 @@ export default function StaffPage() {
         minHeight: '100vh',
         background: '#f5f5f5',
         color: '#111',
-        padding: isMobile ? 4 : 6,
+        padding: isMobile ? 2 : 6,
       }}
     >
       <div
@@ -356,14 +356,14 @@ export default function StaffPage() {
           margin: '0 auto',
           display: 'flex',
           flexDirection: 'column',
-          gap: 10,
+          gap: isMobile ? 8 : 10,
         }}
       >
         <section
           style={{
             background: '#fff',
             borderRadius: 12,
-            padding: isMobile ? 4 : 6,
+            padding: isMobile ? 2 : 6,
           }}
         >
           <div
@@ -427,11 +427,12 @@ export default function StaffPage() {
                   position: 'relative',
                   width: '100%',
                   maxWidth: isMobile ? '100%' : 1840,
-                  aspectRatio: `${MAP_WIDTH} / ${MAP_HEIGHT}`,
-                  minHeight: isMobile ? '72vw' : undefined,
+                  aspectRatio: isMobile ? 'auto' : `${MAP_WIDTH} / ${MAP_HEIGHT}`,
+                  height: isMobile ? 'clamp(320px, 62dvh, 560px)' : undefined,
+                  minHeight: isMobile ? 320 : undefined,
                   margin: '0 auto',
                   overflow: 'hidden',
-                  borderRadius: 12,
+                  borderRadius: isMobile ? 10 : 12,
                   background: '#ffffff',
                 }}
               >
@@ -441,9 +442,9 @@ export default function StaffPage() {
                   draggable={false}
                   style={{
                     position: 'absolute',
-                    inset: '-4%',
-                    width: '108%',
-                    height: '108%',
+                    inset: isMobile ? '-8%' : '-4%',
+                    width: isMobile ? '116%' : '108%',
+                    height: isMobile ? '116%' : '108%',
                     objectFit: 'cover',
                     transform: `translate(${FLOOR_OFFSET_X}px, ${FLOOR_OFFSET_Y}px) rotate(${FLOOR_ROTATION}deg) scale(${FLOOR_SCALE})`,
                     transformOrigin: 'center center',
@@ -457,8 +458,8 @@ export default function StaffPage() {
                     position: 'absolute',
                     inset: 0,
                     backgroundImage: `
-                      linear-gradient(to right, rgba(100,116,139,0.12) 1px, transparent 1px),
-                      linear-gradient(to bottom, rgba(100,116,139,0.12) 1px, transparent 1px)
+                      linear-gradient(to right, rgba(100,116,139,0.14) 1px, transparent 1px),
+                      linear-gradient(to bottom, rgba(100,116,139,0.14) 1px, transparent 1px)
                     `,
                     backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
                     pointerEvents: 'none',
@@ -483,11 +484,11 @@ export default function StaffPage() {
                         top: `${(table.y / MAP_HEIGHT) * 100}%`,
                         width: `${(TABLE_WIDTH / MAP_WIDTH) * 100}%`,
                         height: `${(TABLE_HEIGHT / MAP_HEIGHT) * 100}%`,
-                        minWidth: isMobile ? 24 : 35,
-                        minHeight: isMobile ? 24 : 35,
-                        maxWidth: isMobile ? 30 : 44,
-                        maxHeight: isMobile ? 30 : 44,
-                        borderRadius: 6,
+                        minWidth: isMobile ? 20 : 35,
+                        minHeight: isMobile ? 20 : 35,
+                        maxWidth: isMobile ? 26 : 44,
+                        maxHeight: isMobile ? 26 : 44,
+                        borderRadius: isMobile ? 5 : 6,
                         border: `2px solid ${colors.border}`,
                         background: colors.bg,
                         color: colors.text,
@@ -513,7 +514,7 @@ export default function StaffPage() {
                           whiteSpace: 'nowrap',
                           textOverflow: 'ellipsis',
                           fontWeight: 800,
-                          fontSize: isMobile ? 6 : 7,
+                          fontSize: isMobile ? 5 : 7,
                           lineHeight: 1,
                           textAlign: 'center',
                         }}
@@ -632,118 +633,120 @@ export default function StaffPage() {
                 const colors = getStatusColors(table.status);
 
                 return (
-                <div
-  key={table.id}
-  style={{
-    display: 'grid',
-    gridTemplateColumns: isMobile ? '1fr auto' : '1fr auto',
-    gap: 8,
-    alignItems: 'center',
-  }}
->
-  <button
-    type="button"
-    onClick={(e) => {
-      e.stopPropagation();
-      setStatusMenuTableId((prev) => (prev === table.id ? null : table.id));
-    }}
-    style={{
-      width: '100%',
-      padding: '10px 12px',
-      borderRadius: 10,
-      border: `2px solid ${colors.border}`,
-      background: colors.bg,
-      color: colors.text,
-      fontWeight: 800,
-      fontSize: 14,
-      textAlign: 'left',
-      cursor: 'pointer',
-    }}
-  >
-    {table.name} · {table.status}
-  </button>
+                  <div
+                    key={table.id}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr auto',
+                      gap: 8,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setStatusMenuTableId((prev) =>
+                          prev === table.id ? null : table.id
+                        );
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: 10,
+                        border: `2px solid ${colors.border}`,
+                        background: colors.bg,
+                        color: colors.text,
+                        fontWeight: 800,
+                        fontSize: 14,
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {table.name} · {table.status}
+                    </button>
 
-  <button
-    type="button"
-    onClick={() => router.push(`/staff/table/${table.id}`)}
-    style={{
-      padding: '10px 12px',
-      borderRadius: 10,
-      border: '1px solid #111',
-      background: '#111',
-      color: '#fff',
-      cursor: 'pointer',
-      fontWeight: 700,
-      fontSize: 12,
-      whiteSpace: 'nowrap',
-    }}
-  >
-    Ordine
-  </button>
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/staff/table/${table.id}`)}
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: 10,
+                        border: '1px solid #111',
+                        background: '#111',
+                        color: '#fff',
+                        cursor: 'pointer',
+                        fontWeight: 700,
+                        fontSize: 12,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      Ordine
+                    </button>
 
-  {statusMenuTableId === table.id && (
-    <div
-      onClick={(e) => e.stopPropagation()}
-      style={{
-        gridColumn: '1 / -1',
-        display: 'grid',
-        gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
-        gap: 8,
-        padding: 8,
-        borderRadius: 10,
-        background: '#fff',
-      }}
-    >
-      <button
-        type="button"
-        onClick={() => handleChangeStatus(table.id, 'libero')}
-        style={{
-          padding: '10px 12px',
-          borderRadius: 8,
-          border: '2px solid #16a34a',
-          background: '#dcfce7',
-          color: '#166534',
-          fontWeight: 700,
-          cursor: 'pointer',
-        }}
-      >
-        Libero
-      </button>
+                    {statusMenuTableId === table.id && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          gridColumn: '1 / -1',
+                          display: 'grid',
+                          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+                          gap: 8,
+                          padding: 8,
+                          borderRadius: 10,
+                          background: '#fff',
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleChangeStatus(table.id, 'libero')}
+                          style={{
+                            padding: '10px 12px',
+                            borderRadius: 8,
+                            border: '2px solid #16a34a',
+                            background: '#dcfce7',
+                            color: '#166534',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Libero
+                        </button>
 
-      <button
-        type="button"
-        onClick={() => handleChangeStatus(table.id, 'prenotato')}
-        style={{
-          padding: '10px 12px',
-          borderRadius: 8,
-          border: '2px solid #ea580c',
-          background: '#fed7aa',
-          color: '#9a3412',
-          fontWeight: 700,
-          cursor: 'pointer',
-        }}
-      >
-        Prenotato
-      </button>
+                        <button
+                          type="button"
+                          onClick={() => handleChangeStatus(table.id, 'prenotato')}
+                          style={{
+                            padding: '10px 12px',
+                            borderRadius: 8,
+                            border: '2px solid #ea580c',
+                            background: '#fed7aa',
+                            color: '#9a3412',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Prenotato
+                        </button>
 
-      <button
-        type="button"
-        onClick={() => handleChangeStatus(table.id, 'occupato')}
-        style={{
-          padding: '10px 12px',
-          borderRadius: 8,
-          border: '2px solid #dc2626',
-          background: '#fee2e2',
-          color: '#991b1b',
-          fontWeight: 700,
-          cursor: 'pointer',
-        }}
-      >
-        Occupato
-      </button>
-    </div>
-  )}
-</div>
+                        <button
+                          type="button"
+                          onClick={() => handleChangeStatus(table.id, 'occupato')}
+                          style={{
+                            padding: '10px 12px',
+                            borderRadius: 8,
+                            border: '2px solid #dc2626',
+                            background: '#fee2e2',
+                            color: '#991b1b',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Occupato
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
 
