@@ -34,9 +34,7 @@ const FLOOR_OFFSET_Y = -9;
 const CLIP_TOP = 31;
 const CLIP_RIGHT = 15;
 const CLIP_BOTTOM = 23;
-const CLIP_LEFT = 14;
-
-const MAP_CLIP_PATH = `inset(${CLIP_TOP}% ${CLIP_RIGHT}% ${CLIP_BOTTOM}% ${CLIP_LEFT}% round 12px)`;
+const CLIP_LEFT = 12;
 
 export default function StaffPage() {
   const router = useRouter();
@@ -148,12 +146,15 @@ export default function StaffPage() {
       return;
     }
 
+    const startX = snapToGrid(Math.round((CLIP_LEFT / 100) * MAP_WIDTH) + 20);
+    const startY = snapToGrid(Math.round((CLIP_TOP / 100) * MAP_HEIGHT) + 20);
+
     const { data, error } = await supabase
       .from('tables')
       .insert({
         name,
-        x: 40,
-        y: 40,
+        x: startX,
+        y: startY,
         status: 'libero',
       })
       .select()
@@ -249,14 +250,17 @@ export default function StaffPage() {
 
     if (!drag.moved) return;
 
-   const minX = Math.round((CLIP_LEFT / 100) * MAP_WIDTH);
-const maxX = Math.round(MAP_WIDTH - (CLIP_RIGHT / 100) * MAP_WIDTH - TABLE_WIDTH);
+    const minX = Math.round((CLIP_LEFT / 100) * MAP_WIDTH);
+    const maxX = Math.round(
+      MAP_WIDTH - (CLIP_RIGHT / 100) * MAP_WIDTH - TABLE_WIDTH
+    );
+    const minY = Math.round((CLIP_TOP / 100) * MAP_HEIGHT);
+    const maxY = Math.round(
+      MAP_HEIGHT - (CLIP_BOTTOM / 100) * MAP_HEIGHT - TABLE_HEIGHT
+    );
 
-const minY = Math.round((CLIP_TOP / 100) * MAP_HEIGHT);
-const maxY = Math.round(MAP_HEIGHT - (CLIP_BOTTOM / 100) * MAP_HEIGHT - TABLE_HEIGHT);
-
-const nextX = clamp(snapToGrid(drag.startX + dx), minX, maxX);
-const nextY = clamp(snapToGrid(drag.startY + dy), minY, maxY);
+    const nextX = clamp(snapToGrid(drag.startX + dx), minX, maxX);
+    const nextY = clamp(snapToGrid(drag.startY + dy), minY, maxY);
 
     drag.liveX = nextX;
     drag.liveY = nextY;
@@ -329,6 +333,18 @@ const nextY = clamp(snapToGrid(drag.startY + dy), minY, maxY);
     return tables.filter((table) => table.name.toLowerCase().includes(q));
   }, [tables, search]);
 
+  const visibleAreaStyle: React.CSSProperties = {
+    position: 'absolute',
+    left: `${CLIP_LEFT}%`,
+    top: `${CLIP_TOP}%`,
+    width: `${100 - CLIP_LEFT - CLIP_RIGHT}%`,
+    height: `${100 - CLIP_TOP - CLIP_BOTTOM}%`,
+    border: '2px dashed rgba(37, 99, 235, 0.20)',
+    borderRadius: 10,
+    pointerEvents: 'none',
+    zIndex: 2,
+  };
+
   return (
     <main
       style={{
@@ -340,7 +356,7 @@ const nextY = clamp(snapToGrid(drag.startY + dy), minY, maxY);
     >
       <div
         style={{
-          maxWidth: 1500,
+          maxWidth: 1700,
           margin: '0 auto',
           display: 'flex',
           flexDirection: 'column',
@@ -409,41 +425,41 @@ const nextY = clamp(snapToGrid(drag.startY + dy), minY, maxY);
           </div>
 
           {showMap && (
-           <div
-  style={{
-    width: '100%',
-  }}
->
-  <div
-    style={{
-      position: 'relative',
-      width: '100%',
-      maxWidth: 1320,
-      aspectRatio: `${MAP_WIDTH} / ${MAP_HEIGHT}`,
-      margin: '0 auto',
-      overflow: 'hidden',
-      borderRadius: 12,
-      background: '#eef6fb',
-      clipPath: MAP_CLIP_PATH,
-    }}
-  >
+            <div
+              style={{
+                width: '100%',
+              }}
+            >
+              <div
+                style={{
+                  position: 'relative',
+                  width: '100%',
+                  maxWidth: 'min(96vw, 1600px)',
+                  aspectRatio: `${MAP_WIDTH} / ${MAP_HEIGHT}`,
+                  margin: '0 auto',
+                  overflow: 'hidden',
+                  borderRadius: 12,
+                  background: '#eef6fb',
+                }}
+              >
                 <img
                   src="/piantina-nur.jpeg"
                   alt="Piantina locale NUR"
                   draggable={false}
                   style={{
                     position: 'absolute',
-                    left: '50%',
-                    top: '50%',
+                    inset: 0,
                     width: '100%',
                     height: '100%',
                     objectFit: 'cover',
-                    transform: `translate(calc(-50% + ${FLOOR_OFFSET_X}px), calc(-50% + ${FLOOR_OFFSET_Y}px)) rotate(${FLOOR_ROTATION}deg) scale(${FLOOR_SCALE})`,
+                    transform: `translate(${FLOOR_OFFSET_X}px, ${FLOOR_OFFSET_Y}px) rotate(${FLOOR_ROTATION}deg) scale(${FLOOR_SCALE})`,
                     transformOrigin: 'center center',
                     pointerEvents: 'none',
                     zIndex: 1,
                   }}
                 />
+
+                <div style={visibleAreaStyle} />
 
                 <div
                   style={{
@@ -472,10 +488,15 @@ const nextY = clamp(snapToGrid(drag.startY + dy), minY, maxY);
                       onPointerCancel={(e) => handlePointerCancel(e, table)}
                       style={{
                         position: 'absolute',
-                        left: table.x,
-                        top: table.y,
-                        width: TABLE_WIDTH,
-                        height: TABLE_HEIGHT,
+                        left: `${(table.x / MAP_WIDTH) * 100}%`,
+                        top: `${(table.y / MAP_HEIGHT) * 100}%`,
+                        width: `${(TABLE_WIDTH / MAP_WIDTH) * 100}%`,
+                        height: `${(TABLE_HEIGHT / MAP_HEIGHT) * 100}%`,
+                        minWidth: 35,
+                        minHeight: 35,
+                        maxWidth: 44,
+                        maxHeight: 44,
+                        transform: 'translate(0, 0)',
                         borderRadius: 6,
                         border: `2px solid ${colors.border}`,
                         background: colors.bg,
