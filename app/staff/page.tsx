@@ -31,7 +31,7 @@ const FLOOR_SCALE = 0.97;
 const FLOOR_OFFSET_X = -33;
 const FLOOR_OFFSET_Y = -9;
 
-const MAP_CLIP_PATH = 'inset(29% 15% 23% 14% round 12px)';
+const MAP_CLIP_PATH = 'inset(31% 15% 23% 14% round 12px)';
 
 export default function StaffPage() {
   const router = useRouter();
