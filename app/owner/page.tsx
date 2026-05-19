@@ -750,11 +750,18 @@ export default function OwnerPage() {
         <div style={{ flex: 1, minWidth: 0 }}>
           <h1 style={styles.title}>Dashboard Owner</h1>
           <p style={styles.subtitle}>
-            Gestione menu, credenziali e report prodotti più consumati
+            Gestione menu, credenziali, report e accesso rapido alle prenotazioni
           </p>
         </div>
 
         <div style={isMobile ? styles.topButtonsMobile : styles.topButtonsDesktop}>
+          <button
+            type="button"
+            onClick={() => router.push('/calendar')}
+            style={isMobile ? styles.primaryButtonHalf : styles.primaryButton}
+          >
+            Apri Calendar
+          </button>
           <button
             type="button"
             onClick={() => router.push('/')}
@@ -782,6 +789,22 @@ export default function OwnerPage() {
           }}
         >
           <section style={styles.leftColumn}>
+            <div style={styles.cardCompact}>
+              <h2 style={styles.sectionTitle}>Prenotazioni</h2>
+              <p style={styles.smallText}>
+                Apri velocemente il calendario prenotazioni da owner.
+              </p>
+              <div style={{ marginTop: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => router.push('/calendar')}
+                  style={styles.primaryButtonWide}
+                >
+                  Prenotazioni / Calendar
+                </button>
+              </div>
+            </div>
+
             <div style={styles.cardCompact}>
               <button
                 type="button"
@@ -1620,6 +1643,18 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#444',
     fontWeight: 600,
   },
+  primaryButton: {
+    padding: '7px 10px',
+    borderRadius: 6,
+    border: 'none',
+    backgroundColor: '#111',
+    color: '#fff',
+    cursor: 'pointer',
+    fontSize: 13,
+    fontWeight: 600,
+    minHeight: 34,
+    boxSizing: 'border-box',
+  },
   primaryButtonWide: {
     width: '100%',
     padding: '7px 10px',
@@ -1629,6 +1664,20 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#fff',
     cursor: 'pointer',
     fontSize: 13,
+    fontWeight: 600,
+    minHeight: 34,
+    boxSizing: 'border-box',
+  },
+  primaryButtonHalf: {
+    flex: 1,
+    minWidth: 0,
+    padding: '7px 8px',
+    borderRadius: 6,
+    border: 'none',
+    backgroundColor: '#111',
+    color: '#fff',
+    cursor: 'pointer',
+    fontSize: 12,
     fontWeight: 600,
     minHeight: 34,
     boxSizing: 'border-box',
