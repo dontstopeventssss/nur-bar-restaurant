@@ -6,6 +6,7 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin, { DateClickArg } from '@fullcalendar/interaction';
+import listPlugin from '@fullcalendar/list';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -109,7 +110,9 @@ export default function CalendarPage() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
 
   const [showModal, setShowModal] = useState(false);
-  const [editingReservationId, setEditingReservationId] = useState<string | null>(null);
+  const [editingReservationId, setEditingReservationId] = useState<string | null>(
+    null
+  );
 
   const [selectedDate, setSelectedDate] = useState('');
   const [arrivalTime, setArrivalTime] = useState('20:00');
@@ -212,9 +215,9 @@ export default function CalendarPage() {
 
       return {
         id: reservation.id,
-        title: `${getTimePart(reservation.reservation_time)} • ${reservation.customer_name} • ${tableName} • ${
-          reservation.people_count ?? 0
-        } persone`,
+        title: `${getTimePart(reservation.reservation_time)} • ${
+          reservation.customer_name
+        } • ${tableName} • ${reservation.people_count ?? 0} persone`,
         start: reservation.reservation_time,
         allDay: false,
         backgroundColor: UI.primary,
@@ -243,7 +246,7 @@ export default function CalendarPage() {
     }
 
     if (!arrivalTime) {
-      alert('Inserisci l’orario.');
+      alert("Inserisci l’orario.");
       return;
     }
 
@@ -371,7 +374,14 @@ export default function CalendarPage() {
   }
 
   return (
-    <main style={{ padding: 16, backgroundColor: UI.bg, color: UI.text, minHeight: '100vh' }}>
+    <main
+      style={{
+        padding: 16,
+        backgroundColor: UI.bg,
+        color: UI.text,
+        minHeight: '100vh',
+      }}
+    >
       <div
         style={{
           display: 'flex',
@@ -385,7 +395,8 @@ export default function CalendarPage() {
         <div>
           <h1 style={{ margin: 0, fontSize: 26 }}>Calendario prenotazioni</h1>
           <div style={{ marginTop: 4, fontSize: 13, color: UI.textMuted }}>
-            Clicca un giorno per creare una prenotazione, clicca una prenotazione per modificarla.
+            Clicca un giorno per creare una prenotazione, clicca una prenotazione per
+            modificarla.
           </div>
         </div>
 
@@ -436,19 +447,19 @@ export default function CalendarPage() {
         }}
       >
         <FullCalendar
-          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
           initialView="dayGridMonth"
           locale="it"
           headerToolbar={{
             left: 'prev,next today',
             center: 'title',
-            right: 'dayGridMonth,timeGridWeek,timeGridDay',
+            right: 'dayGridMonth,timeGridDay,listDay',
           }}
           buttonText={{
             today: 'Oggi',
             month: 'Mese',
-            week: 'Settimana',
             day: 'Giorno',
+            listDay: 'Prenotazioni giorno',
           }}
           height="auto"
           editable={false}
@@ -495,9 +506,13 @@ export default function CalendarPage() {
             >
               <div>
                 <h2 style={{ margin: 0, fontSize: 20 }}>
-                  {editingReservationId ? 'Modifica prenotazione' : 'Nuova prenotazione'}
+                  {editingReservationId
+                    ? 'Modifica prenotazione'
+                    : 'Nuova prenotazione'}
                 </h2>
-                <div style={{ fontSize: 12, color: UI.textMuted, marginTop: 3 }}>
+                <div
+                  style={{ fontSize: 12, color: UI.textMuted, marginTop: 3 }}
+                >
                   Giorno selezionato: {selectedDate || '-'}
                 </div>
               </div>
