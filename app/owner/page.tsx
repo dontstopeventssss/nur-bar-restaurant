@@ -1137,7 +1137,9 @@ export default function OwnerPage() {
                                     minWidth: 0,
                                   }}
                                 >
-                                  <span style={{ overflowWrap: 'anywhere' }}>{item.name}</span>
+                                  <span style={{ overflowWrap: 'anywhere' }}>
+                                    {item.name}
+                                  </span>
                                   {item.is_fuori_menu && (
                                     <span
                                       style={{
