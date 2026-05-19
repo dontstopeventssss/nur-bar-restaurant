@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -100,8 +100,17 @@ function sameDay(dateTimeA: string, dateTimeB: string) {
   return dateTimeA.slice(0, 10) === dateTimeB.slice(0, 10);
 }
 
+function formatDateForInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export default function CalendarPage() {
   const router = useRouter();
+  const calendarRef = useRef<FullCalendar | null>(null);
+  const hiddenDatePickerRef = useRef<HTMLInputElement | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -121,6 +130,11 @@ export default function CalendarPage() {
   const [phone, setPhone] = useState('');
   const [selectedTableId, setSelectedTableId] = useState('');
   const [notes, setNotes] = useState('');
+
+  const [currentView, setCurrentView] = useState('dayGridMonth');
+  const [calendarCurrentDate, setCalendarCurrentDate] = useState(() =>
+    formatDateForInput(new Date())
+  );
 
   useEffect(() => {
     const loadData = async () => {
@@ -168,12 +182,7 @@ export default function CalendarPage() {
 
   const openNewReservation = (date: Date) => {
     resetForm();
-
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-
-    setSelectedDate(`${year}-${month}-${day}`);
+    setSelectedDate(formatDateForInput(date));
     setArrivalTime('20:00');
     setShowModal(true);
   };
@@ -215,9 +224,7 @@ export default function CalendarPage() {
 
       return {
         id: reservation.id,
-        title: `${getTimePart(reservation.reservation_time)} • ${
-          reservation.customer_name
-        } • ${tableName} • ${reservation.people_count ?? 0} persone`,
+        title: `${getTimePart(reservation.reservation_time)} • ${reservation.customer_name} • ${tableName} • ${reservation.people_count ?? 0} persone`,
         start: reservation.reservation_time,
         allDay: false,
         backgroundColor: UI.primary,
@@ -235,6 +242,34 @@ export default function CalendarPage() {
     const reservation = reservations.find((r) => r.id === arg.event.id);
     if (!reservation) return;
     openEditReservation(reservation);
+  };
+
+  const openCalendarPicker = () => {
+    const input = hiddenDatePickerRef.current;
+    if (!input) return;
+
+    input.value = calendarCurrentDate;
+
+    if (typeof input.showPicker === 'function') {
+      input.showPicker();
+      return;
+    }
+
+    input.click();
+  };
+
+  const handleJumpToDate = (value: string) => {
+    if (!value) return;
+
+    const calendarApi = calendarRef.current?.getApi();
+    if (!calendarApi) return;
+
+    setCalendarCurrentDate(value);
+    calendarApi.gotoDate(value);
+
+    if (currentView === 'timeGridDay') {
+      calendarApi.changeView('timeGridDay', value);
+    }
   };
 
   const handleSaveReservation = async () => {
@@ -395,8 +430,7 @@ export default function CalendarPage() {
         <div>
           <h1 style={{ margin: 0, fontSize: 26 }}>Calendario prenotazioni</h1>
           <div style={{ marginTop: 4, fontSize: 13, color: UI.textMuted }}>
-            Clicca un giorno per creare una prenotazione, clicca una prenotazione per
-            modificarla.
+            Clicca un giorno per creare una prenotazione, clicca una prenotazione per modificarla.
           </div>
         </div>
 
@@ -437,6 +471,22 @@ export default function CalendarPage() {
         </div>
       </div>
 
+      <input
+        ref={hiddenDatePickerRef}
+        type="date"
+        value={calendarCurrentDate}
+        onChange={(e) => handleJumpToDate(e.target.value)}
+        style={{
+          position: 'absolute',
+          opacity: 0,
+          pointerEvents: 'none',
+          width: 1,
+          height: 1,
+        }}
+        tabIndex={-1}
+        aria-hidden="true"
+      />
+
       <div
         style={{
           backgroundColor: UI.surface,
@@ -447,25 +497,37 @@ export default function CalendarPage() {
         }}
       >
         <FullCalendar
+          ref={calendarRef}
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
           initialView="dayGridMonth"
           locale="it"
           headerToolbar={{
-            left: 'prev,next today',
+            left: currentView === 'timeGridDay' ? 'prev,next datePickerButton today' : 'prev,next today',
             center: 'title',
-            right: 'dayGridMonth,timeGridDay,listDay',
+            right: 'dayGridMonth,timeGridDay,listWeek',
+          }}
+          customButtons={{
+            datePickerButton: {
+              text: '📅',
+              click: openCalendarPicker,
+            },
           }}
           buttonText={{
             today: 'Oggi',
             month: 'Mese',
             day: 'Giorno',
-            listDay: 'Prenotazioni giorno',
+            listWeek: 'Prenotazioni lista',
           }}
+          noEventsContent="Nessuna prenotazione"
           height="auto"
           editable={false}
           selectable={true}
           dateClick={handleDateClick}
           eventClick={handleEventClick}
+          datesSet={(info) => {
+            setCurrentView(info.view.type);
+            setCalendarCurrentDate(formatDateForInput(info.view.currentStart));
+          }}
           events={calendarEvents}
         />
       </div>
