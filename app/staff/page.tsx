@@ -19,6 +19,14 @@ type TableRow = {
   status: TableStatus;
 };
 
+type TableLayoutOverrideRow = {
+  id: string;
+  service_date: string;
+  table_id: string;
+  x: number;
+  y: number;
+};
+
 const GRID_SIZE = 20;
 const MAP_WIDTH = 980;
 const MAP_HEIGHT = 620;
@@ -39,7 +47,9 @@ const CLIP_LEFT = 8;
 export default function StaffPage() {
   const router = useRouter();
 
-  const [tables, setTables] = useState<TableRow[]>([]);
+  const [baseTables, setBaseTables] = useState<TableRow[]>([]);
+  const [layoutOverrides, setLayoutOverrides] = useState<TableLayoutOverrideRow[]>([]);
+  const [selectedDate, setSelectedDate] = useState('');
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [newTableName, setNewTableName] = useState('');
@@ -79,8 +89,32 @@ export default function StaffPage() {
   );
 
   useEffect(() => {
-    loadTables();
+    loadBaseTables();
   }, []);
+
+  useEffect(() => {
+    async function loadOverridesForDate() {
+      if (!selectedDate) {
+        setLayoutOverrides([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('table_layout_overrides')
+        .select('*')
+        .eq('service_date', selectedDate);
+
+      if (error) {
+        console.error('Errore caricamento layout del giorno', error);
+        setLayoutOverrides([]);
+        return;
+      }
+
+      setLayoutOverrides((data as TableLayoutOverrideRow[]) ?? []);
+    }
+
+    loadOverridesForDate();
+  }, [selectedDate]);
 
   useEffect(() => {
     const closeMenus = () => setStatusMenuTableId(null);
@@ -98,7 +132,7 @@ export default function StaffPage() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  async function loadTables() {
+  async function loadBaseTables() {
     setLoading(true);
 
     const { data, error } = await supabase
@@ -112,9 +146,31 @@ export default function StaffPage() {
       return;
     }
 
-    setTables((data as TableRow[]) ?? []);
+    setBaseTables((data as TableRow[]) ?? []);
     setLoading(false);
   }
+
+  const tables = useMemo(() => {
+    if (!selectedDate || layoutOverrides.length === 0) {
+      return baseTables;
+    }
+
+    const overridesMap = new Map(
+      layoutOverrides.map((item) => [item.table_id, item])
+    );
+
+    return baseTables.map((table) => {
+      const override = overridesMap.get(table.id);
+
+      if (!override) return table;
+
+      return {
+        ...table,
+        x: override.x,
+        y: override.y,
+      };
+    });
+  }, [baseTables, layoutOverrides, selectedDate]);
 
   function snapToGrid(value: number) {
     return Math.round(value / GRID_SIZE) * GRID_SIZE;
@@ -175,7 +231,7 @@ export default function StaffPage() {
       return;
     }
 
-    setTables((prev) =>
+    setBaseTables((prev) =>
       [...prev, data as TableRow].sort((a, b) => a.name.localeCompare(b.name))
     );
     setNewTableName('');
@@ -193,7 +249,7 @@ export default function StaffPage() {
       return;
     }
 
-    setTables((prev) =>
+    setBaseTables((prev) =>
       prev.map((table) =>
         table.id === tableId ? { ...table, status } : table
       )
@@ -202,18 +258,101 @@ export default function StaffPage() {
   }
 
   async function persistTablePosition(tableId: string, x: number, y: number) {
+    if (selectedDate) {
+      const { data, error } = await supabase
+        .from('table_layout_overrides')
+        .upsert(
+          {
+            service_date: selectedDate,
+            table_id: tableId,
+            x,
+            y,
+          },
+          {
+            onConflict: 'service_date,table_id',
+          }
+        )
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Errore salvataggio posizione tavolo per data', error);
+        return;
+      }
+
+      const saved = data as TableLayoutOverrideRow;
+
+      setLayoutOverrides((prev) => {
+        const exists = prev.some(
+          (item) =>
+            item.service_date === saved.service_date &&
+            item.table_id === saved.table_id
+        );
+
+        if (exists) {
+          return prev.map((item) =>
+            item.service_date === saved.service_date &&
+            item.table_id === saved.table_id
+              ? saved
+              : item
+          );
+        }
+
+        return [...prev, saved];
+      });
+
+      return;
+    }
+
     const { error } = await supabase
       .from('tables')
       .update({ x, y })
       .eq('id', tableId);
 
     if (error) {
-      console.error('Errore salvataggio posizione tavolo', error);
+      console.error('Errore salvataggio posizione tavolo base', error);
+      return;
     }
+
+    setBaseTables((prev) =>
+      prev.map((table) =>
+        table.id === tableId ? { ...table, x, y } : table
+      )
+    );
   }
 
   function updateTablePosition(tableId: string, x: number, y: number) {
-    setTables((prev) =>
+    if (selectedDate) {
+      setLayoutOverrides((prev) => {
+        const existing = prev.find(
+          (item) =>
+            item.table_id === tableId && item.service_date === selectedDate
+        );
+
+        if (existing) {
+          return prev.map((item) =>
+            item.table_id === tableId && item.service_date === selectedDate
+              ? { ...item, x, y }
+              : item
+          );
+        }
+
+        return [
+          ...prev,
+          {
+            id: `temp-${tableId}-${selectedDate}`,
+            service_date: selectedDate,
+            table_id: tableId,
+            x,
+            y,
+          },
+        ];
+      });
+
+      return;
+    }
+
+    setBaseTables((prev) =>
       prev.map((table) =>
         table.id === tableId ? { ...table, x, y } : table
       )
@@ -388,6 +527,22 @@ export default function StaffPage() {
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button
                 type="button"
+                onClick={() => router.push('/calendar')}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  border: '1px solid #ccc',
+                  background: '#fff',
+                  color: '#111',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                Calendario
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setShowMap((prev) => !prev)}
                 style={{
                   padding: '10px 12px',
@@ -417,6 +572,70 @@ export default function StaffPage() {
               >
                 ← Home
               </button>
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              gap: 8,
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              marginBottom: 10,
+            }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ fontSize: 12, fontWeight: 700, color: '#444' }}>
+                Layout del giorno
+              </label>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  border: '1px solid #ccc',
+                  fontSize: 14,
+                  background: '#fff',
+                  color: '#111',
+                }}
+              />
+            </div>
+
+            {selectedDate && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedDate('');
+                  setLayoutOverrides([]);
+                }}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  border: '1px solid #ccc',
+                  background: '#fff',
+                  color: '#111',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  alignSelf: 'flex-end',
+                }}
+              >
+                Torna layout base
+              </button>
+            )}
+
+            <div
+              style={{
+                alignSelf: 'flex-end',
+                fontSize: 12,
+                color: '#666',
+                fontWeight: 600,
+              }}
+            >
+              {selectedDate
+                ? `Stai modificando automaticamente la mappa del ${selectedDate}`
+                : 'Stai modificando la mappa base'}
             </div>
           </div>
 
