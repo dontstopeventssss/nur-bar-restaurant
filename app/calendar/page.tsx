@@ -675,37 +675,44 @@ export default function CalendarPage() {
               </button>
             </div>
 
-            {selectedDate && venueCapacity > 0 && (
-              <div
-                style={{
-                  marginBottom: 14,
-                  padding: 12,
-                  borderRadius: 8,
-                  border: `1px solid ${UI.borderSoft}`,
-                  backgroundColor:
-                    remainingSeatsAfterSave < 0 ? '#fff7ed' : '#f8fafc',
-                  display: 'grid',
-                  gap: 6,
-                }}
-              >
-                <div style={{ fontSize: 13, fontWeight: 700 }}>
-                  Disponibilità del giorno
-                </div>
-                <div style={{ fontSize: 13, color: UI.textMuted }}>
-                  Totali: {venueCapacity} • Già prenotati: {bookedSeatsForSelectedDay} •
-                  Questa prenotazione: {parsedCurrentPeopleCount || 0}
-                </div>
-                <div
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: remainingSeatsAfterSave < 0 ? UI.danger : UI.success,
-                  }}
-                >
-                  Posti liberi dopo il salvataggio: {remainingSeatsAfterSave}
-                </div>
-              </div>
-            )}
+{selectedDate && venueCapacity > 0 && (
+  <div
+    style={{
+      marginBottom: 14,
+      padding: 12,
+      borderRadius: 8,
+      border: `1px solid ${UI.borderSoft}`,
+      backgroundColor:
+        remainingSeatsAfterSave < 0 ? '#fee2e2' : '#f0fdf4',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+      flexWrap: 'wrap',
+    }}
+  >
+    <div
+      style={{
+        fontSize: 14,
+        fontWeight: 700,
+        color: UI.text,
+      }}
+    >
+      Disponibilità del giorno
+    </div>
+
+    <div
+      style={{
+        fontSize: 24,
+        fontWeight: 800,
+        color: remainingSeatsAfterSave < 0 ? UI.danger : UI.success,
+        lineHeight: 1,
+      }}
+    >
+      {Math.max(remainingSeatsAfterSave, 0)}
+    </div>
+  </div>
+)}
 
             <div
               style={{
