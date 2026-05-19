@@ -5,10 +5,7 @@ import { useRouter } from 'next/navigation';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
-import interactionPlugin, {
-  DateClickArg,
-  EventClickArg,
-} from '@fullcalendar/interaction';
+import interactionPlugin, { DateClickArg } from '@fullcalendar/interaction';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -239,7 +236,7 @@ export default function CalendarPage() {
     openNewReservation(arg.date);
   };
 
-  const handleEventClick = (arg: EventClickArg) => {
+  const handleEventClick = (arg: any) => {
     const reservation = reservations.find((r) => r.id === arg.event.id);
     if (!reservation) return;
     openEditReservation(reservation);
