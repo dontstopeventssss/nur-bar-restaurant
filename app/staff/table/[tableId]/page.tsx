@@ -102,6 +102,7 @@ export default function TableOrderPage() {
   const [saving, setSaving] = useState(false);
   const [closing, setClosing] = useState(false);
   const [sending, setSending] = useState(false);
+  const [sending, setSending] = useState(false);
 
   const [pendingItems, setPendingItems] = useState<Record<string, number>>({});
   const [productSearch, setProductSearch] = useState('');
@@ -788,68 +789,293 @@ export default function TableOrderPage() {
         </div>
 
         <div style={{ textAlign: 'right', minWidth: 160 }}>
-          <div style={{ fontSize: 12, color: UI.textMuted }}>Totale ordine</div>
-          <div style={{ fontSize: 26, fontWeight: 700, color: UI.text }}>
-            € {total.toFixed(2)}
-          </div>
+  <div style={{ fontSize: 12, color: UI.textMuted }}>Totale ordine</div>
+  <div style={{ fontSize: 26, fontWeight: 700, color: UI.text }}>
+    € {total.toFixed(2)}
+  </div>
 
-          {hasPending && (
-            <div style={{ fontSize: 12, color: UI.pendingText, marginTop: 2 }}>
-              + € {pendingTotal.toFixed(2)} da inviare
-            </div>
-          )}
+  {hasPending && (
+    <div style={{ fontSize: 12, color: UI.pendingText, marginTop: 2 }}>
+      + € {pendingTotal.toFixed(2)} da inviare
+    </div>
+  )}
 
-          {hasPending && (
-            <button
-              type="button"
-              onClick={handleSendOrder}
-              disabled={sending}
-              style={{
-                marginTop: 8,
-                padding: '10px 14px',
-                borderRadius: 6,
-                border: 'none',
-                fontSize: 14,
-                fontWeight: 700,
-                cursor: sending ? 'not-allowed' : 'pointer',
-                backgroundColor: sending ? UI.inputBorder : UI.warning,
-                color: UI.warningText,
-                display: 'block',
-                width: '100%',
-              }}
-            >
-              {sending
-                ? 'Invio in corso…'
-                : `📤 Invia ordine (${Object.keys(pendingItems).length} prodott${
-                    Object.keys(pendingItems).length === 1 ? 'o' : 'i'
-                  })`}
-            </button>
-          )}
+  {hasPending && (
+    <button
+      type="button"
+      onClick={handleSendOrder}
+      disabled={sending}
+      style={{
+        marginTop: 8,
+        padding: '10px 14px',
+        borderRadius: 6,
+        border: 'none',
+        fontSize: 14,
+        fontWeight: 700,
+        cursor: sending ? 'not-allowed' : 'pointer',
+        backgroundColor: sending ? UI.inputBorder : UI.warning,
+        color: UI.warningText,
+        display: 'block',
+        width: '100%',
+      }}
+    >
+      {sending
+        ? 'Invio in corso…'
+        : `📤 Invia ordine (${Object.keys(pendingItems).length} prodott${
+            Object.keys(pendingItems).length === 1 ? 'o' : 'i'
+          })`}
+    </button>
+  )}
 
-          <button
-            type="button"
-            onClick={handleCloseOrder}
-            disabled={!order || total <= 0 || closing}
+  <button
+    type="button"
+    onClick={() => setShowOrderSummary((prev) => !prev)}
+    disabled={!order || total <= 0}
+    style={{
+      marginTop: 8,
+      padding: '8px 14px',
+      borderRadius: 6,
+      border: `1px solid ${UI.border}`,
+      fontSize: 13,
+      fontWeight: 600,
+      cursor: !order || total <= 0 ? 'not-allowed' : 'pointer',
+      backgroundColor: UI.surface,
+      color: UI.text,
+      display: 'block',
+      width: '100%',
+    }}
+  >
+    {showOrderSummary ? 'Nascondi conto' : '👁️ Vedi conto'}
+  </button>
+
+  <button
+    type="button"
+    onClick={handleCloseOrder}
+    disabled={!order || total <= 0 || closing}
+    style={{
+      marginTop: 8,
+      padding: '8px 14px',
+      borderRadius: 6,
+      border: 'none',
+      fontSize: 13,
+      fontWeight: 600,
+      cursor: !order || total <= 0 || closing ? 'not-allowed' : 'pointer',
+      backgroundColor:
+        !order || total <= 0 || closing ? UI.inputBorder : UI.success,
+      color: UI.successText,
+      display: 'block',
+      width: '100%',
+    }}
+  >
+    {closing ? 'Chiusura in corso…' : '🧾 Chiudi conto'}
+  </button>
+</div>
+      </header>
+{showOrderSummary && (
+  <section
+    style={{
+      marginBottom: 16,
+      borderRadius: 8,
+      border: `1px solid ${UI.border}`,
+      backgroundColor: UI.surfaceAlt,
+      padding: 12,
+      fontSize: 13,
+    }}
+  >
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+        gap: 8,
+        flexWrap: 'wrap',
+      }}
+    >
+      <h2
+        style={{
+          margin: 0,
+          fontSize: 15,
+          fontWeight: 700,
+          color: UI.text,
+        }}
+      >
+        Ordine completo del tavolo
+      </h2>
+      <span style={{ fontSize: 12, color: UI.textMuted }}>
+        {Object.keys(orderItems).length} prodotti
+      </span>
+    </div>
+
+    {Object.keys(orderItems).length === 0 ? (
+      <div style={{ color: UI.textSoft }}>Nessun prodotto ancora ordinato.</div>
+    ) : (
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+          marginBottom: 8,
+        }}
+      >
+        {Object.values(orderItems).map((oi) => (
+          <div
+            key={oi.menu_item_id}
             style={{
-              marginTop: 8,
-              padding: '8px 14px',
-              borderRadius: 6,
-              border: 'none',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: !order || total <= 0 || closing ? 'not-allowed' : 'pointer',
-              backgroundColor:
-                !order || total <= 0 || closing ? UI.inputBorder : UI.success,
-              color: UI.successText,
-              display: 'block',
-              width: '100%',
+              display: 'flex',
+              justifyContent: 'space-between',
+              gap: 8,
+              padding: '6px 0',
+              borderBottom: `1px dashed ${UI.borderSoft}`,
             }}
           >
-            {closing ? 'Chiusura in corso…' : '🧾 Chiudi conto'}
-          </button>
-        </div>
-      </header>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2,
+                flex: 1,
+                minWidth: 0,
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <span
+                  style={{
+                    fontWeight: 600,
+                    color: UI.text,
+                    fontSize: 13,
+                  }}
+                >
+                  {oi.item_name}
+                </span>
 
+                {oi.is_fuori_menu && (
+                  <span
+                    style={{
+                      fontSize: 9,
+                      fontWeight: 700,
+                      padding: '1px 5px',
+                      borderRadius: 999,
+                      backgroundColor: UI.fuoriMenuBg,
+                      color: UI.fuoriMenuText,
+                    }}
+                  >
+                    FUORI MENÙ
+                  </span>
+                )}
+              </div>
+
+              <span
+                style={{
+                  fontSize: 11,
+                  color: UI.textSoft,
+                }}
+              >
+                {oi.quantity} × € {Number(oi.price).toFixed(2)}
+              </span>
+            </div>
+
+            <div
+              style={{
+                minWidth: 70,
+                textAlign: 'right',
+                fontWeight: 600,
+                color: UI.text,
+              }}
+            >
+              € {(oi.quantity * Number(oi.price)).toFixed(2)}
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+
+    {hasPending && (
+      <div
+        style={{
+          marginTop: 8,
+          paddingTop: 8,
+          borderTop: `1px solid ${UI.borderSoft}`,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 12,
+            fontWeight: 700,
+            color: UI.pendingText,
+            marginBottom: 6,
+          }}
+        >
+          Selezionato ma non ancora inviato
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {Object.entries(pendingItems).map(([menuItemId, qty]) => {
+            const item = menuItems.find((m) => m.id === menuItemId);
+            if (!item) return null;
+
+            return (
+              <div
+                key={menuItemId}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  gap: 8,
+                  fontSize: 12,
+                  color: UI.pendingText,
+                }}
+              >
+                <span>
+                  {qty} × {item.name}
+                </span>
+                <span>€ {(qty * item.price).toFixed(2)}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    )}
+
+    <div
+      style={{
+        marginTop: 10,
+        paddingTop: 10,
+        borderTop: `1px solid ${UI.border}`,
+        display: 'flex',
+        justifyContent: 'space-between',
+        gap: 8,
+        fontWeight: 700,
+        color: UI.text,
+      }}
+    >
+      <span>Totale registrato</span>
+      <span>€ {total.toFixed(2)}</span>
+    </div>
+
+    {hasPending && (
+      <div
+        style={{
+          marginTop: 4,
+          display: 'flex',
+          justifyContent: 'space-between',
+          gap: 8,
+          fontSize: 12,
+          color: UI.pendingText,
+        }}
+      >
+        <span>Ancora da inviare</span>
+        <span>+ € {pendingTotal.toFixed(2)}</span>
+      </div>
+    )}
+  </section>
+)}
       <section
         style={{
           marginBottom: 16,
