@@ -34,7 +34,7 @@ type Reservation = {
 
 type AppSettingsRow = {
   key: string;
-  venue_capacity: number;
+  value_number: number | null;
   updated_at?: string;
 };
 
@@ -166,18 +166,19 @@ export default function CalendarPage() {
 
         const { data: settingsData, error: settingsError } = await supabase
           .from('app_settings')
-          .select('key, venue_capacity')
-          .eq('key', 'main')
-          .limit(1)
+          .select('key, value_number')
+          .eq('key', 'max_capacity')
           .single();
 
         if (settingsError) {
-          console.error('Errore caricamento impostazioni', settingsError);
+          console.error('Errore caricamento capienza massima', settingsError);
         }
 
         setTables((tablesData as Table[]) ?? []);
         setReservations((reservationsData as Reservation[]) ?? []);
-        setVenueCapacity((settingsData as AppSettingsRow | null)?.venue_capacity ?? 0);
+        setVenueCapacity(
+          Number((settingsData as AppSettingsRow | null)?.value_number ?? 0)
+        );
       } finally {
         setLoading(false);
       }
@@ -278,12 +279,6 @@ export default function CalendarPage() {
 
   const handleDateClick = (arg: DateClickArg) => {
     openNewReservation(arg.date);
-  };
-
-  const handleEventClick = (arg: any) => {
-    const reservation = reservations.find((r) => r.id === arg.event.id);
-    if (!reservation) return;
-    openEditReservation(reservation);
   };
 
   const handleSaveReservation = async () => {
