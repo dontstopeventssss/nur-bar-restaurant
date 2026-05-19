@@ -49,6 +49,12 @@ type SalesReportRow = {
   is_fuori_menu: boolean;
 };
 
+type AppSettingRow = {
+  key: string;
+  value_text: string | null;
+  value_number: number | null;
+};
+
 type ReportRange = 'today' | 'week' | 'month' | 'all';
 
 const DEFAULT_OWNER_USERNAME = 'Franco';
@@ -112,6 +118,9 @@ export default function OwnerPage() {
   const [editCategoryId, setEditCategoryId] = useState('');
   const [editDestination, setEditDestination] = useState<Destination>('bar');
   const [editDescription, setEditDescription] = useState('');
+
+  const [maxCapacity, setMaxCapacity] = useState('');
+  const [savingCapacity, setSavingCapacity] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -207,6 +216,19 @@ export default function OwnerPage() {
       }
 
       setMenuItems((itemsData as MenuItem[]) ?? []);
+
+      const { data: settingsRow, error: settingsError } = await supabase
+        .from('app_settings')
+        .select('key, value_text, value_number')
+        .eq('key', 'max_capacity')
+        .maybeSingle();
+
+      if (settingsError) {
+        console.error('Errore caricamento capienza massima', settingsError);
+      } else if (settingsRow) {
+        const parsedSettings = settingsRow as AppSettingRow;
+        setMaxCapacity(String(parsedSettings.value_number ?? 0));
+      }
 
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
@@ -341,6 +363,38 @@ export default function OwnerPage() {
     window.localStorage.setItem('nur_owner_username', newUser);
     window.localStorage.setItem('nur_owner_password', newPass);
     alert('Credenziali owner aggiornate con successo.');
+  };
+
+  const handleSaveMaxCapacity = async () => {
+    const parsed = Number(maxCapacity);
+
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      alert('Inserisci una capienza massima valida.');
+      return;
+    }
+
+    setSavingCapacity(true);
+    try {
+      const { error } = await supabase
+        .from('app_settings')
+        .upsert(
+          {
+            key: 'max_capacity',
+            value_number: parsed,
+          },
+          { onConflict: 'key' }
+        );
+
+      if (error) {
+        console.error('Errore salvataggio capienza massima', error);
+        alert('Errore durante il salvataggio della capienza massima.');
+        return;
+      }
+
+      alert('Capienza massima salvata con successo.');
+    } finally {
+      setSavingCapacity(false);
+    }
   };
 
   const handleCreateCategory = async () => {
@@ -789,7 +843,6 @@ export default function OwnerPage() {
           }}
         >
           <section style={styles.leftColumn}>
-            
             <div style={styles.cardCompact}>
               <button
                 type="button"
@@ -834,6 +887,39 @@ export default function OwnerPage() {
                   </div>
                 </div>
               )}
+            </div>
+
+            <div style={styles.cardCompact}>
+              <h2 style={styles.sectionTitle}>Capienza locale</h2>
+              <p style={styles.smallText}>
+                Imposta il numero massimo totale di coperti gestibili dal locale.
+              </p>
+
+              <div style={{ marginTop: 8 }} />
+
+              <div style={styles.formColumnTight}>
+                <div>
+                  <label style={styles.label}>Capienza massima</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={maxCapacity}
+                    onChange={(e) => setMaxCapacity(e.target.value)}
+                    placeholder="Es. 80"
+                    style={styles.input}
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSaveMaxCapacity}
+                  style={styles.primaryButtonWide}
+                  disabled={savingCapacity}
+                >
+                  {savingCapacity ? 'Salvataggio...' : 'Salva capienza'}
+                </button>
+              </div>
             </div>
 
             <div style={styles.cardCompact}>
