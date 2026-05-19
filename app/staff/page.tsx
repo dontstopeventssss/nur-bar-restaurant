@@ -27,6 +27,23 @@ type TableLayoutOverrideRow = {
   y: number;
 };
 
+type ReservationRow = {
+  id: string;
+  table_id: string | null;
+  customer_name: string | null;
+  people_count: number | null;
+  reservation_time: string;
+  phone: string | null;
+  notes: string | null;
+  status: string | null;
+  created_at: string | null;
+};
+
+type DerivedTableRow = TableRow & {
+  derivedStatus: TableStatus;
+  hasReservationForSelectedDate: boolean;
+};
+
 const GRID_SIZE = 20;
 const MAP_WIDTH = 980;
 const MAP_HEIGHT = 620;
@@ -44,12 +61,22 @@ const CLIP_RIGHT = 15;
 const CLIP_BOTTOM = 23;
 const CLIP_LEFT = 8;
 
+function getDatePart(value: string) {
+  return value.slice(0, 10);
+}
+
+function isReservationActive(status: string | null | undefined) {
+  const normalized = (status ?? '').trim().toLowerCase();
+  return normalized !== 'annullata' && normalized !== 'cancellata';
+}
+
 export default function StaffPage() {
   const router = useRouter();
 
   const [baseTables, setBaseTables] = useState<TableRow[]>([]);
   const [layoutOverrides, setLayoutOverrides] = useState<TableLayoutOverrideRow[]>([]);
   const [selectedDate, setSelectedDate] = useState('');
+  const [dayReservations, setDayReservations] = useState<ReservationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [newTableName, setNewTableName] = useState('');
@@ -89,7 +116,7 @@ export default function StaffPage() {
   );
 
   useEffect(() => {
-    loadBaseTables();
+    loadInitialData();
   }, []);
 
   useEffect(() => {
@@ -117,6 +144,40 @@ export default function StaffPage() {
   }, [selectedDate]);
 
   useEffect(() => {
+    async function loadReservationsForDate() {
+      if (!selectedDate) {
+        setDayReservations([]);
+        return;
+      }
+
+      const dayStart = `${selectedDate}T00:00:00`;
+      const dayEnd = `${selectedDate}T23:59:59`;
+
+      const { data, error } = await supabase
+        .from('reservations')
+        .select('*')
+        .gte('reservation_time', dayStart)
+        .lte('reservation_time', dayEnd)
+        .not('table_id', 'is', null)
+        .order('reservation_time', { ascending: true });
+
+      if (error) {
+        console.error('Errore caricamento prenotazioni giorno', error);
+        setDayReservations([]);
+        return;
+      }
+
+      const rows = ((data as ReservationRow[]) ?? []).filter((reservation) =>
+        isReservationActive(reservation.status)
+      );
+
+      setDayReservations(rows);
+    }
+
+    loadReservationsForDate();
+  }, [selectedDate]);
+
+  useEffect(() => {
     const closeMenus = () => setStatusMenuTableId(null);
     window.addEventListener('click', closeMenus);
     return () => window.removeEventListener('click', closeMenus);
@@ -132,9 +193,78 @@ export default function StaffPage() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  async function loadBaseTables() {
-    setLoading(true);
+  useEffect(() => {
+    const channel = supabase
+      .channel('staff-live-sync')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tables' },
+        async () => {
+          await loadBaseTables();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'table_layout_overrides' },
+        async () => {
+          if (!selectedDate) return;
 
+          const { data, error } = await supabase
+            .from('table_layout_overrides')
+            .select('*')
+            .eq('service_date', selectedDate);
+
+          if (error) {
+            console.error('Errore realtime layout overrides', error);
+            return;
+          }
+
+          setLayoutOverrides((data as TableLayoutOverrideRow[]) ?? []);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'reservations' },
+        async () => {
+          if (!selectedDate) return;
+
+          const dayStart = `${selectedDate}T00:00:00`;
+          const dayEnd = `${selectedDate}T23:59:59`;
+
+          const { data, error } = await supabase
+            .from('reservations')
+            .select('*')
+            .gte('reservation_time', dayStart)
+            .lte('reservation_time', dayEnd)
+            .not('table_id', 'is', null)
+            .order('reservation_time', { ascending: true });
+
+          if (error) {
+            console.error('Errore realtime reservations', error);
+            return;
+          }
+
+          const rows = ((data as ReservationRow[]) ?? []).filter((reservation) =>
+            isReservationActive(reservation.status)
+          );
+
+          setDayReservations(rows);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedDate]);
+
+  async function loadInitialData() {
+    setLoading(true);
+    await loadBaseTables();
+    setLoading(false);
+  }
+
+  async function loadBaseTables() {
     const { data, error } = await supabase
       .from('tables')
       .select('*')
@@ -142,35 +272,40 @@ export default function StaffPage() {
 
     if (error) {
       console.error('Errore caricamento tavoli', error);
-      setLoading(false);
       return;
     }
 
     setBaseTables((data as TableRow[]) ?? []);
-    setLoading(false);
   }
 
-  const tables = useMemo(() => {
-    if (!selectedDate || layoutOverrides.length === 0) {
-      return baseTables;
-    }
+  const reservedTableIds = useMemo(() => {
+    return new Set(
+      dayReservations
+        .map((reservation) => reservation.table_id)
+        .filter(Boolean) as string[]
+    );
+  }, [dayReservations]);
 
+  const tables = useMemo<DerivedTableRow[]>(() => {
     const overridesMap = new Map(
       layoutOverrides.map((item) => [item.table_id, item])
     );
 
     return baseTables.map((table) => {
-      const override = overridesMap.get(table.id);
-
-      if (!override) return table;
+      const override = selectedDate ? overridesMap.get(table.id) : undefined;
+      const hasReservationForSelectedDate = selectedDate
+        ? reservedTableIds.has(table.id)
+        : false;
 
       return {
         ...table,
-        x: override.x,
-        y: override.y,
+        x: override ? override.x : table.x,
+        y: override ? override.y : table.y,
+        derivedStatus: hasReservationForSelectedDate ? 'prenotato' : table.status,
+        hasReservationForSelectedDate,
       };
     });
-  }, [baseTables, layoutOverrides, selectedDate]);
+  }, [baseTables, layoutOverrides, selectedDate, reservedTableIds]);
 
   function snapToGrid(value: number) {
     return Math.round(value / GRID_SIZE) * GRID_SIZE;
@@ -238,6 +373,16 @@ export default function StaffPage() {
   }
 
   async function handleChangeStatus(tableId: string, status: TableStatus) {
+    const targetTable = tables.find((table) => table.id === tableId);
+
+    if (selectedDate && targetTable?.hasReservationForSelectedDate) {
+      alert(
+        'Questo tavolo è prenotato nel giorno selezionato. Modifica o annulla la prenotazione dal calendario.'
+      );
+      setStatusMenuTableId(null);
+      return;
+    }
+
     const { error } = await supabase
       .from('tables')
       .update({ status })
@@ -361,7 +506,7 @@ export default function StaffPage() {
 
   function handlePointerDown(
     e: React.PointerEvent<HTMLButtonElement>,
-    table: TableRow
+    table: DerivedTableRow
   ) {
     e.preventDefault();
     e.stopPropagation();
@@ -383,7 +528,7 @@ export default function StaffPage() {
 
   function handlePointerMove(
     e: React.PointerEvent<HTMLButtonElement>,
-    table: TableRow
+    table: DerivedTableRow
   ) {
     const drag = dragStateRef.current;
     if (drag.tableId !== table.id || drag.pointerId !== e.pointerId) return;
@@ -417,7 +562,7 @@ export default function StaffPage() {
 
   async function handlePointerUp(
     e: React.PointerEvent<HTMLButtonElement>,
-    table: TableRow
+    table: DerivedTableRow
   ) {
     const drag = dragStateRef.current;
     if (drag.tableId !== table.id || drag.pointerId !== e.pointerId) return;
@@ -450,7 +595,7 @@ export default function StaffPage() {
 
   function handlePointerCancel(
     e: React.PointerEvent<HTMLButtonElement>,
-    table: TableRow
+    table: DerivedTableRow
   ) {
     const drag = dragStateRef.current;
     if (drag.tableId !== table.id || drag.pointerId !== e.pointerId) return;
@@ -609,6 +754,7 @@ export default function StaffPage() {
                 onClick={() => {
                   setSelectedDate('');
                   setLayoutOverrides([]);
+                  setDayReservations([]);
                 }}
                 style={{
                   padding: '10px 12px',
@@ -634,7 +780,7 @@ export default function StaffPage() {
               }}
             >
               {selectedDate
-                ? `Stai modificando automaticamente la mappa del ${selectedDate}`
+                ? `Stai vedendo il layout e le prenotazioni del ${selectedDate}`
                 : 'Stai modificando la mappa base'}
             </div>
           </div>
@@ -696,7 +842,7 @@ export default function StaffPage() {
                     />
 
                     {tables.map((table) => {
-                      const colors = getStatusColors(table.status);
+                      const colors = getStatusColors(table.derivedStatus);
 
                       return (
                         <button
@@ -727,7 +873,7 @@ export default function StaffPage() {
                             boxShadow: '0 2px 6px rgba(0,0,0,0.10)',
                             overflow: 'hidden',
                           }}
-                          title={`${table.name} - ${table.status}`}
+                          title={`${table.name} - ${table.derivedStatus}`}
                         >
                           <span
                             style={{
@@ -795,7 +941,7 @@ export default function StaffPage() {
                   />
 
                   {tables.map((table) => {
-                    const colors = getStatusColors(table.status);
+                    const colors = getStatusColors(table.derivedStatus);
 
                     return (
                       <button
@@ -830,7 +976,7 @@ export default function StaffPage() {
                           boxShadow: '0 2px 6px rgba(0,0,0,0.10)',
                           overflow: 'hidden',
                         }}
-                        title={`${table.name} - ${table.status}`}
+                        title={`${table.name} - ${table.derivedStatus}`}
                       >
                         <span
                           style={{
@@ -958,7 +1104,7 @@ export default function StaffPage() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {filteredTables.map((table) => {
-                const colors = getStatusColors(table.status);
+                const colors = getStatusColors(table.derivedStatus);
 
                 return (
                   <div
@@ -991,7 +1137,8 @@ export default function StaffPage() {
                         cursor: 'pointer',
                       }}
                     >
-                      {table.name} · {table.status}
+                      {table.name} · {table.derivedStatus}
+                      {table.hasReservationForSelectedDate ? ' · da calendario' : ''}
                     </button>
 
                     <button
@@ -1028,6 +1175,7 @@ export default function StaffPage() {
                         <button
                           type="button"
                           onClick={() => handleChangeStatus(table.id, 'libero')}
+                          disabled={table.hasReservationForSelectedDate}
                           style={{
                             padding: '10px 12px',
                             borderRadius: 8,
@@ -1035,7 +1183,8 @@ export default function StaffPage() {
                             background: '#dcfce7',
                             color: '#166534',
                             fontWeight: 700,
-                            cursor: 'pointer',
+                            cursor: table.hasReservationForSelectedDate ? 'not-allowed' : 'pointer',
+                            opacity: table.hasReservationForSelectedDate ? 0.5 : 1,
                           }}
                         >
                           Libero
@@ -1060,6 +1209,7 @@ export default function StaffPage() {
                         <button
                           type="button"
                           onClick={() => handleChangeStatus(table.id, 'occupato')}
+                          disabled={table.hasReservationForSelectedDate}
                           style={{
                             padding: '10px 12px',
                             borderRadius: 8,
@@ -1067,7 +1217,8 @@ export default function StaffPage() {
                             background: '#fee2e2',
                             color: '#991b1b',
                             fontWeight: 700,
-                            cursor: 'pointer',
+                            cursor: table.hasReservationForSelectedDate ? 'not-allowed' : 'pointer',
+                            opacity: table.hasReservationForSelectedDate ? 0.5 : 1,
                           }}
                         >
                           Occupato
