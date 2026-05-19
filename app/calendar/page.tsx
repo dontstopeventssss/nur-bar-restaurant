@@ -19,8 +19,6 @@ type Table = {
   status: 'libero' | 'prenotato' | 'occupato';
 };
 
-type ReservationStatus = 'confermata' | 'arrivata' | 'annullata';
-
 type Reservation = {
   id: string;
   table_id: string | null;
@@ -36,18 +34,13 @@ type Reservation = {
 const UI = {
   bg: '#ffffff',
   surface: '#ffffff',
-  surfaceAlt: '#fafafa',
   border: '#dddddd',
   borderSoft: '#eeeeee',
   text: '#111111',
   textMuted: '#666666',
-  textSoft: '#777777',
   primary: '#01696f',
   primaryText: '#ffffff',
   success: '#059669',
-  successText: '#ffffff',
-  warning: '#f59e0b',
-  warningText: '#ffffff',
   danger: '#dc2626',
   dangerText: '#ffffff',
   inputBg: '#ffffff',
@@ -89,11 +82,17 @@ function toDateTimeLocalString(value: string) {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
-function dateToLocalDateTime(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}T20:00`;
+function getDatePart(value: string) {
+  return value.slice(0, 10);
+}
+
+function getTimePart(value: string) {
+  const local = toDateTimeLocalString(value);
+  return local.slice(11, 16);
+}
+
+function mergeDateAndTime(dateStr: string, timeStr: string) {
+  return `${dateStr}T${timeStr}`;
 }
 
 function sameDay(dateTimeA: string, dateTimeB: string) {
@@ -112,13 +111,12 @@ export default function CalendarPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingReservationId, setEditingReservationId] = useState<string | null>(null);
 
+  const [selectedDate, setSelectedDate] = useState('');
+  const [arrivalTime, setArrivalTime] = useState('20:00');
   const [customerName, setCustomerName] = useState('');
-  const [reservationTime, setReservationTime] = useState('');
   const [peopleCount, setPeopleCount] = useState('2');
   const [phone, setPhone] = useState('');
   const [selectedTableId, setSelectedTableId] = useState('');
-  const [reservationStatus, setReservationStatus] =
-    useState<ReservationStatus>('confermata');
   const [notes, setNotes] = useState('');
 
   useEffect(() => {
@@ -156,81 +154,75 @@ export default function CalendarPage() {
 
   const resetForm = () => {
     setEditingReservationId(null);
+    setSelectedDate('');
+    setArrivalTime('20:00');
     setCustomerName('');
-    setReservationTime('');
     setPeopleCount('2');
     setPhone('');
     setSelectedTableId('');
-    setReservationStatus('confermata');
     setNotes('');
   };
 
   const openNewReservation = (date: Date) => {
     resetForm();
-    setReservationTime(dateToLocalDateTime(date));
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    setSelectedDate(`${year}-${month}-${day}`);
+    setArrivalTime('20:00');
     setShowModal(true);
   };
 
   const openEditReservation = (reservation: Reservation) => {
     setEditingReservationId(reservation.id);
+    setSelectedDate(getDatePart(reservation.reservation_time));
+    setArrivalTime(getTimePart(reservation.reservation_time));
     setCustomerName(reservation.customer_name ?? '');
-    setReservationTime(toDateTimeLocalString(reservation.reservation_time));
     setPeopleCount(String(reservation.people_count ?? 1));
     setPhone(reservation.phone ?? '');
     setSelectedTableId(reservation.table_id ?? '');
-    setReservationStatus(
-      reservation.status === 'arrivata' || reservation.status === 'annullata'
-        ? reservation.status
-        : 'confermata'
-    );
     setNotes(reservation.notes ?? '');
     setShowModal(true);
   };
 
-  const selectedDateOnly = useMemo(() => {
-    if (!reservationTime) return '';
-    return reservationTime.slice(0, 10);
-  }, [reservationTime]);
-
   const busyTableIds = useMemo(() => {
-    if (!selectedDateOnly) return [];
+    if (!selectedDate) return [];
 
     return reservations
       .filter(
         (r) =>
           r.id !== editingReservationId &&
           r.status !== 'annullata' &&
-          sameDay(r.reservation_time, `${selectedDateOnly}T00:00`)
+          sameDay(r.reservation_time, `${selectedDate}T00:00`)
       )
       .map((r) => r.table_id)
       .filter(Boolean) as string[];
-  }, [reservations, selectedDateOnly, editingReservationId]);
+  }, [reservations, selectedDate, editingReservationId]);
+
+  const visibleReservations = useMemo(() => {
+    return reservations.filter((r) => r.status !== 'annullata');
+  }, [reservations]);
 
   const calendarEvents = useMemo(() => {
-    return reservations.map((reservation) => {
+    return visibleReservations.map((reservation) => {
       const table = tables.find((t) => t.id === reservation.table_id);
       const tableName = table?.name ?? 'Senza tavolo';
 
-      const statusColor =
-        reservation.status === 'arrivata'
-          ? UI.success
-          : reservation.status === 'annullata'
-          ? UI.danger
-          : UI.primary;
-
       return {
         id: reservation.id,
-        title: `${reservation.customer_name} • ${tableName} • ${
+        title: `${getTimePart(reservation.reservation_time)} • ${reservation.customer_name} • ${tableName} • ${
           reservation.people_count ?? 0
         } persone`,
         start: reservation.reservation_time,
         allDay: false,
-        backgroundColor: statusColor,
-        borderColor: statusColor,
+        backgroundColor: UI.primary,
+        borderColor: UI.primary,
         textColor: '#ffffff',
       };
     });
-  }, [reservations, tables]);
+  }, [visibleReservations, tables]);
 
   const handleDateClick = (arg: DateClickArg) => {
     openNewReservation(arg.date);
@@ -245,13 +237,18 @@ export default function CalendarPage() {
   const handleSaveReservation = async () => {
     const parsedPeopleCount = Number(peopleCount);
 
-    if (!customerName.trim()) {
-      alert('Inserisci il nome del cliente.');
+    if (!selectedDate) {
+      alert('Seleziona un giorno dal calendario.');
       return;
     }
 
-    if (!reservationTime) {
-      alert('Inserisci data e orario di arrivo.');
+    if (!arrivalTime) {
+      alert('Inserisci l’orario.');
+      return;
+    }
+
+    if (!customerName.trim()) {
+      alert('Inserisci il nome del cliente.');
       return;
     }
 
@@ -270,16 +267,17 @@ export default function CalendarPage() {
       return;
     }
 
+    const reservationDateTime = mergeDateAndTime(selectedDate, arrivalTime);
+
     setSaving(true);
 
     try {
       const payload = {
         customer_name: customerName.trim(),
-        reservation_time: reservationTime,
+        reservation_time: reservationDateTime,
         people_count: parsedPeopleCount,
         phone: phone.trim(),
         table_id: selectedTableId,
-        status: reservationStatus,
         notes: notes.trim() || null,
       };
 
@@ -304,7 +302,10 @@ export default function CalendarPage() {
       } else {
         const { data, error } = await supabase
           .from('reservations')
-          .insert(payload)
+          .insert({
+            ...payload,
+            status: 'confermata',
+          })
           .select()
           .single();
 
@@ -332,23 +333,28 @@ export default function CalendarPage() {
   const handleDeleteReservation = async () => {
     if (!editingReservationId) return;
 
-    const confirmed = window.confirm('Vuoi davvero eliminare questa prenotazione?');
+    const confirmed = window.confirm('Vuoi davvero annullare questa prenotazione?');
     if (!confirmed) return;
 
     setSaving(true);
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('reservations')
-        .delete()
-        .eq('id', editingReservationId);
+        .update({ status: 'annullata' })
+        .eq('id', editingReservationId)
+        .select()
+        .single();
 
       if (error) {
-        console.error('Errore eliminazione prenotazione', error);
-        alert('Errore durante l’eliminazione della prenotazione.');
+        console.error('Errore annullamento prenotazione', error);
+        alert('Errore durante l’annullamento della prenotazione.');
         return;
       }
 
-      setReservations((prev) => prev.filter((r) => r.id !== editingReservationId));
+      const updated = data as Reservation;
+      setReservations((prev) =>
+        prev.map((r) => (r.id === updated.id ? updated : r))
+      );
       setShowModal(false);
       resetForm();
     } finally {
@@ -379,7 +385,7 @@ export default function CalendarPage() {
         <div>
           <h1 style={{ margin: 0, fontSize: 26 }}>Calendario prenotazioni</h1>
           <div style={{ marginTop: 4, fontSize: 13, color: UI.textMuted }}>
-            Clicca un giorno per creare una prenotazione, clicca un evento per modificarlo.
+            Clicca un giorno per creare una prenotazione, clicca una prenotazione per modificarla.
           </div>
         </div>
 
@@ -492,7 +498,7 @@ export default function CalendarPage() {
                   {editingReservationId ? 'Modifica prenotazione' : 'Nuova prenotazione'}
                 </h2>
                 <div style={{ fontSize: 12, color: UI.textMuted, marginTop: 3 }}>
-                  Giorno selezionato: {selectedDateOnly || '-'}
+                  Giorno selezionato: {selectedDate || '-'}
                 </div>
               </div>
 
@@ -525,22 +531,22 @@ export default function CalendarPage() {
               }}
             >
               <div>
+                <label style={labelStyle}>Orario</label>
+                <input
+                  type="time"
+                  value={arrivalTime}
+                  onChange={(e) => setArrivalTime(e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
+
+              <div>
                 <label style={labelStyle}>Nome cliente</label>
                 <input
                   type="text"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                   placeholder="Es. Mario Rossi"
-                  style={inputStyle}
-                />
-              </div>
-
-              <div>
-                <label style={labelStyle}>Data e orario arrivo</label>
-                <input
-                  type="datetime-local"
-                  value={reservationTime}
-                  onChange={(e) => setReservationTime(e.target.value)}
                   style={inputStyle}
                 />
               </div>
@@ -588,21 +594,6 @@ export default function CalendarPage() {
                 </select>
               </div>
 
-              <div>
-                <label style={labelStyle}>Stato</label>
-                <select
-                  value={reservationStatus}
-                  onChange={(e) =>
-                    setReservationStatus(e.target.value as ReservationStatus)
-                  }
-                  style={inputStyle}
-                >
-                  <option value="confermata">Confermata</option>
-                  <option value="arrivata">Arrivata</option>
-                  <option value="annullata">Annullata</option>
-                </select>
-              </div>
-
               <div style={{ gridColumn: '1 / -1' }}>
                 <label style={labelStyle}>Note</label>
                 <textarea
@@ -642,7 +633,7 @@ export default function CalendarPage() {
                       cursor: saving ? 'not-allowed' : 'pointer',
                     }}
                   >
-                    Elimina
+                    Annulla prenotazione
                   </button>
                 )}
               </div>
@@ -665,7 +656,7 @@ export default function CalendarPage() {
                     cursor: 'pointer',
                   }}
                 >
-                  Annulla
+                  Chiudi
                 </button>
 
                 <button
