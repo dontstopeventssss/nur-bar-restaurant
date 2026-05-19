@@ -789,22 +789,7 @@ export default function OwnerPage() {
           }}
         >
           <section style={styles.leftColumn}>
-            <div style={styles.cardCompact}>
-              <h2 style={styles.sectionTitle}>Prenotazioni</h2>
-              <p style={styles.smallText}>
-                Apri velocemente il calendario prenotazioni da owner.
-              </p>
-              <div style={{ marginTop: 8 }}>
-                <button
-                  type="button"
-                  onClick={() => router.push('/calendar')}
-                  style={styles.primaryButtonWide}
-                >
-                  Prenotazioni / Calendar
-                </button>
-              </div>
-            </div>
-
+            
             <div style={styles.cardCompact}>
               <button
                 type="button"
