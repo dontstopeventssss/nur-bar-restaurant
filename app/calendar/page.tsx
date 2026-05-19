@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -32,6 +32,12 @@ type Reservation = {
   created_at: string | null;
 };
 
+type AppSettingsRow = {
+  key: string;
+  venue_capacity: number;
+  updated_at?: string;
+};
+
 const UI = {
   bg: '#ffffff',
   surface: '#ffffff',
@@ -42,6 +48,7 @@ const UI = {
   primary: '#01696f',
   primaryText: '#ffffff',
   success: '#059669',
+  warning: '#d97706',
   danger: '#dc2626',
   dangerText: '#ffffff',
   inputBg: '#ffffff',
@@ -100,23 +107,26 @@ function sameDay(dateTimeA: string, dateTimeB: string) {
   return dateTimeA.slice(0, 10) === dateTimeB.slice(0, 10);
 }
 
-function formatDateForInput(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+function formatDateLabel(dateStr: string) {
+  if (!dateStr) return '-';
+  const d = new Date(`${dateStr}T00:00:00`);
+  return d.toLocaleDateString('it-IT', {
+    weekday: 'long',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
 }
 
 export default function CalendarPage() {
   const router = useRouter();
-  const calendarRef = useRef<FullCalendar | null>(null);
-  const hiddenDatePickerRef = useRef<HTMLInputElement | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const [tables, setTables] = useState<Table[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [venueCapacity, setVenueCapacity] = useState(0);
 
   const [showModal, setShowModal] = useState(false);
   const [editingReservationId, setEditingReservationId] = useState<string | null>(
@@ -130,11 +140,6 @@ export default function CalendarPage() {
   const [phone, setPhone] = useState('');
   const [selectedTableId, setSelectedTableId] = useState('');
   const [notes, setNotes] = useState('');
-
-  const [currentView, setCurrentView] = useState('dayGridMonth');
-  const [calendarCurrentDate, setCalendarCurrentDate] = useState(() =>
-    formatDateForInput(new Date())
-  );
 
   useEffect(() => {
     const loadData = async () => {
@@ -159,8 +164,20 @@ export default function CalendarPage() {
           return;
         }
 
+        const { data: settingsData, error: settingsError } = await supabase
+          .from('app_settings')
+          .select('key, venue_capacity')
+          .eq('key', 'main')
+          .limit(1)
+          .single();
+
+        if (settingsError) {
+          console.error('Errore caricamento impostazioni', settingsError);
+        }
+
         setTables((tablesData as Table[]) ?? []);
         setReservations((reservationsData as Reservation[]) ?? []);
+        setVenueCapacity((settingsData as AppSettingsRow | null)?.venue_capacity ?? 0);
       } finally {
         setLoading(false);
       }
@@ -182,7 +199,12 @@ export default function CalendarPage() {
 
   const openNewReservation = (date: Date) => {
     resetForm();
-    setSelectedDate(formatDateForInput(date));
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    setSelectedDate(`${year}-${month}-${day}`);
     setArrivalTime('20:00');
     setShowModal(true);
   };
@@ -199,6 +221,10 @@ export default function CalendarPage() {
     setShowModal(true);
   };
 
+  const visibleReservations = useMemo(() => {
+    return reservations.filter((r) => r.status !== 'annullata');
+  }, [reservations]);
+
   const busyTableIds = useMemo(() => {
     if (!selectedDate) return [];
 
@@ -213,9 +239,25 @@ export default function CalendarPage() {
       .filter(Boolean) as string[];
   }, [reservations, selectedDate, editingReservationId]);
 
-  const visibleReservations = useMemo(() => {
-    return reservations.filter((r) => r.status !== 'annullata');
-  }, [reservations]);
+  const bookedSeatsForSelectedDay = useMemo(() => {
+    if (!selectedDate) return 0;
+
+    return reservations
+      .filter(
+        (r) =>
+          r.id !== editingReservationId &&
+          r.status !== 'annullata' &&
+          sameDay(r.reservation_time, `${selectedDate}T00:00`)
+      )
+      .reduce((sum, r) => sum + Number(r.people_count ?? 0), 0);
+  }, [reservations, selectedDate, editingReservationId]);
+
+  const parsedCurrentPeopleCount = Number(peopleCount || 0);
+  const projectedBookedSeats = bookedSeatsForSelectedDay + (parsedCurrentPeopleCount || 0);
+  const remainingSeats =
+    venueCapacity > 0 ? Math.max(venueCapacity - bookedSeatsForSelectedDay, 0) : 0;
+  const remainingSeatsAfterSave =
+    venueCapacity > 0 ? venueCapacity - projectedBookedSeats : 0;
 
   const calendarEvents = useMemo(() => {
     return visibleReservations.map((reservation) => {
@@ -242,34 +284,6 @@ export default function CalendarPage() {
     const reservation = reservations.find((r) => r.id === arg.event.id);
     if (!reservation) return;
     openEditReservation(reservation);
-  };
-
-  const openCalendarPicker = () => {
-    const input = hiddenDatePickerRef.current;
-    if (!input) return;
-
-    input.value = calendarCurrentDate;
-
-    if (typeof input.showPicker === 'function') {
-      input.showPicker();
-      return;
-    }
-
-    input.click();
-  };
-
-  const handleJumpToDate = (value: string) => {
-    if (!value) return;
-
-    const calendarApi = calendarRef.current?.getApi();
-    if (!calendarApi) return;
-
-    setCalendarCurrentDate(value);
-    calendarApi.gotoDate(value);
-
-    if (currentView === 'timeGridDay') {
-      calendarApi.changeView('timeGridDay', value);
-    }
   };
 
   const handleSaveReservation = async () => {
@@ -302,6 +316,13 @@ export default function CalendarPage() {
 
     if (!selectedTableId) {
       alert('Seleziona un tavolo.');
+      return;
+    }
+
+    if (venueCapacity > 0 && projectedBookedSeats > venueCapacity) {
+      alert(
+        `Capienza superata. Posti totali: ${venueCapacity}. Già impegnati: ${bookedSeatsForSelectedDay}. Questa prenotazione porterebbe il totale a ${projectedBookedSeats}.`
+      );
       return;
     }
 
@@ -471,21 +492,77 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      <input
-        ref={hiddenDatePickerRef}
-        type="date"
-        value={calendarCurrentDate}
-        onChange={(e) => handleJumpToDate(e.target.value)}
+      <div
         style={{
-          position: 'absolute',
-          opacity: 0,
-          pointerEvents: 'none',
-          width: 1,
-          height: 1,
+          display: 'flex',
+          gap: 8,
+          flexWrap: 'wrap',
+          marginBottom: 12,
         }}
-        tabIndex={-1}
-        aria-hidden="true"
-      />
+      >
+        <div
+          style={{
+            padding: '8px 12px',
+            borderRadius: 999,
+            border: `1px solid ${UI.border}`,
+            backgroundColor: UI.surface,
+            fontSize: 13,
+            fontWeight: 600,
+          }}
+        >
+          Capienza locale: {venueCapacity > 0 ? venueCapacity : 'non impostata'}
+        </div>
+
+        {selectedDate && (
+          <>
+            <div
+              style={{
+                padding: '8px 12px',
+                borderRadius: 999,
+                border: `1px solid ${UI.border}`,
+                backgroundColor: UI.surface,
+                fontSize: 13,
+                fontWeight: 600,
+              }}
+            >
+              Giorno: {formatDateLabel(selectedDate)}
+            </div>
+
+            <div
+              style={{
+                padding: '8px 12px',
+                borderRadius: 999,
+                border: `1px solid ${UI.border}`,
+                backgroundColor: UI.surface,
+                fontSize: 13,
+                fontWeight: 600,
+              }}
+            >
+              Prenotati: {bookedSeatsForSelectedDay}
+            </div>
+
+            <div
+              style={{
+                padding: '8px 12px',
+                borderRadius: 999,
+                border: `1px solid ${UI.border}`,
+                backgroundColor:
+                  venueCapacity > 0 && remainingSeats === 0
+                    ? '#fee2e2'
+                    : '#ecfdf5',
+                color:
+                  venueCapacity > 0 && remainingSeats === 0
+                    ? UI.danger
+                    : UI.success,
+                fontSize: 13,
+                fontWeight: 700,
+              }}
+            >
+              Liberi: {venueCapacity > 0 ? remainingSeats : '-'}
+            </div>
+          </>
+        )}
+      </div>
 
       <div
         style={{
@@ -497,20 +574,13 @@ export default function CalendarPage() {
         }}
       >
         <FullCalendar
-          ref={calendarRef}
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
           initialView="dayGridMonth"
           locale="it"
           headerToolbar={{
-            left: currentView === 'timeGridDay' ? 'prev,next datePickerButton today' : 'prev,next today',
+            left: 'prev,next today',
             center: 'title',
             right: 'dayGridMonth,timeGridDay,listWeek',
-          }}
-          customButtons={{
-            datePickerButton: {
-              text: '📅',
-              click: openCalendarPicker,
-            },
           }}
           buttonText={{
             today: 'Oggi',
@@ -518,15 +588,25 @@ export default function CalendarPage() {
             day: 'Giorno',
             listWeek: 'Prenotazioni lista',
           }}
-          noEventsContent="Nessuna prenotazione"
           height="auto"
           editable={false}
           selectable={true}
-          dateClick={handleDateClick}
-          eventClick={handleEventClick}
+          dateClick={(arg) => {
+            const clickedDate = arg.dateStr.slice(0, 10);
+            setSelectedDate(clickedDate);
+            handleDateClick(arg);
+          }}
+          eventClick={(arg) => {
+            const reservation = reservations.find((r) => r.id === arg.event.id);
+            if (!reservation) return;
+            setSelectedDate(getDatePart(reservation.reservation_time));
+            openEditReservation(reservation);
+          }}
           datesSet={(info) => {
-            setCurrentView(info.view.type);
-            setCalendarCurrentDate(formatDateForInput(info.view.currentStart));
+            const currentDate = info.startStr.slice(0, 10);
+            if (info.view.type === 'timeGridDay') {
+              setSelectedDate(currentDate);
+            }
           }}
           events={calendarEvents}
         />
@@ -599,6 +679,38 @@ export default function CalendarPage() {
                 ✕
               </button>
             </div>
+
+            {selectedDate && venueCapacity > 0 && (
+              <div
+                style={{
+                  marginBottom: 14,
+                  padding: 12,
+                  borderRadius: 8,
+                  border: `1px solid ${UI.borderSoft}`,
+                  backgroundColor:
+                    remainingSeatsAfterSave < 0 ? '#fff7ed' : '#f8fafc',
+                  display: 'grid',
+                  gap: 6,
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 700 }}>
+                  Disponibilità del giorno
+                </div>
+                <div style={{ fontSize: 13, color: UI.textMuted }}>
+                  Totali: {venueCapacity} • Già prenotati: {bookedSeatsForSelectedDay} •
+                  Questa prenotazione: {parsedCurrentPeopleCount || 0}
+                </div>
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: remainingSeatsAfterSave < 0 ? UI.danger : UI.success,
+                  }}
+                >
+                  Posti liberi dopo il salvataggio: {remainingSeatsAfterSave}
+                </div>
+              </div>
+            )}
 
             <div
               style={{
