@@ -31,24 +31,28 @@ const FullCalendar = dynamic(() => import('@fullcalendar/react'), {
   ),
 });
 
-type ReservationStatus = 'confirmed' | 'cancelled';
-
-type Reservation = {
-  id: string;
-  customer_name: string;
-  customer_phone: string | null;
-  reservation_time: string;
-  guests: number;
-  table_id: string | null;
-  notes: string | null;
-  status: ReservationStatus;
-  created_at?: string;
-};
+type TableStatus = 'libero' | 'occupato' | 'prenotato';
 
 type TableRow = {
   id: string;
   name: string;
-  seats?: number | null;
+  x: number;
+  y: number;
+  status: TableStatus;
+};
+
+type ReservationStatus = string | null;
+
+type ReservationRow = {
+  id: string;
+  table_id: string | null;
+  customer_name: string | null;
+  people_count: number | null;
+  reservation_time: string;
+  phone: string | null;
+  notes: string | null;
+  status: ReservationStatus;
+  created_at: string | null;
 };
 
 type AppSettingsRow = {
@@ -58,10 +62,10 @@ type AppSettingsRow = {
 
 type ReservationForm = {
   customer_name: string;
-  customer_phone: string;
+  phone: string;
   reservation_date: string;
   reservation_hour: string;
-  guests: number;
+  people_count: number;
   table_id: string;
   notes: string;
 };
@@ -136,6 +140,11 @@ function formatHumanDateTime(value: string) {
   });
 }
 
+function isReservationActive(status: string | null | undefined) {
+  const normalized = (status ?? '').trim().toLowerCase();
+  return normalized !== 'annullata' && normalized !== 'cancellata';
+}
+
 export default function CalendarPage() {
   const router = useRouter();
 
@@ -145,7 +154,7 @@ export default function CalendarPage() {
   const [isMobile, setIsMobile] = useState(false);
 
   const [tables, setTables] = useState<TableRow[]>([]);
-  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [reservations, setReservations] = useState<ReservationRow[]>([]);
   const [venueCapacity, setVenueCapacity] = useState<number>(0);
 
   const [selectedDate, setSelectedDate] = useState<string>(toDateInputValue(new Date()));
@@ -158,10 +167,10 @@ export default function CalendarPage() {
 
   const [form, setForm] = useState<ReservationForm>({
     customer_name: '',
-    customer_phone: '',
+    phone: '',
     reservation_date: toDateInputValue(new Date()),
     reservation_hour: '20:00',
-    guests: 2,
+    people_count: 2,
     table_id: '',
     notes: '',
   });
@@ -170,7 +179,8 @@ export default function CalendarPage() {
 
   useEffect(() => {
     const onResize = () => {
-      setIsMobile(window.innerWidth < 768);
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
     };
 
     onResize();
@@ -183,33 +193,42 @@ export default function CalendarPage() {
     router.prefetch('/owner');
   }, [router]);
 
-  const loadStaticData = useCallback(async () => {
-    const [{ data: tablesData, error: tablesError }, { data: settingsData, error: settingsError }] =
-      await Promise.all([
-        supabase.from('tables').select('id, name, seats').order('name', { ascending: true }),
-        supabase.from('app_settings').select('key, value_number').eq('key', 'max_capacity').single(),
-      ]);
+  const loadTables = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('tables')
+      .select('*')
+      .order('name', { ascending: true });
 
-    if (tablesError) {
-      console.error('Errore caricamento tavoli', tablesError);
-    } else {
-      console.log('TAVOLI CARICATI CALENDAR:', tablesData);
-      setTables((tablesData as TableRow[]) ?? []);
+    if (error) {
+      console.error('Errore caricamento tavoli calendar', error);
+      setTables([]);
+      return;
     }
 
-    if (settingsError) {
-      console.error('Errore caricamento capienza massima', settingsError);
-    } else {
-      setVenueCapacity(Number((settingsData as AppSettingsRow | null)?.value_number ?? 0));
+    console.log('CALENDAR TABLES:', data);
+    setTables((data as TableRow[]) ?? []);
+  }, []);
+
+  const loadSettings = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('app_settings')
+      .select('key, value_number')
+      .eq('key', 'max_capacity')
+      .maybeSingle();
+
+    if (error) {
+      console.error('Errore caricamento capienza massima', error);
+      setVenueCapacity(0);
+      return;
     }
+
+    setVenueCapacity(Number((data as AppSettingsRow | null)?.value_number ?? 0));
   }, []);
 
   const loadReservationsRange = useCallback(async (start: string, end: string) => {
     const { data, error } = await supabase
       .from('reservations')
-      .select(
-        'id, customer_name, customer_phone, reservation_time, guests, table_id, notes, status, created_at'
-      )
+      .select('*')
       .gte('reservation_time', start)
       .lte('reservation_time', end)
       .order('reservation_time', { ascending: true });
@@ -219,7 +238,7 @@ export default function CalendarPage() {
       return;
     }
 
-    setReservations((data as Reservation[]) ?? []);
+    setReservations((data as ReservationRow[]) ?? []);
     setLoadedRange({ start, end });
   }, []);
 
@@ -231,12 +250,29 @@ export default function CalendarPage() {
       const initialStart = toLocalDateTimeString(addDays(startOfMonth(now), -14));
       const initialEnd = toLocalDateTimeString(addDays(endOfMonth(addDays(now, 60)), 14));
 
-      await Promise.all([loadStaticData(), loadReservationsRange(initialStart, initialEnd)]);
+      await Promise.all([loadTables(), loadSettings(), loadReservationsRange(initialStart, initialEnd)]);
       setLoading(false);
     };
 
     run();
-  }, [loadReservationsRange, loadStaticData]);
+  }, [loadReservationsRange, loadSettings, loadTables]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('calendar-live-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tables' }, async () => {
+        await loadTables();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, async () => {
+        if (!loadedRange) return;
+        await loadReservationsRange(loadedRange.start, loadedRange.end);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadReservationsRange, loadTables, loadedRange]);
 
   useEffect(() => {
     if (tables.length === 0) return;
@@ -252,19 +288,21 @@ export default function CalendarPage() {
     return reservations.map((reservation) => {
       const tableName = tables.find((t) => t.id === reservation.table_id)?.name;
       const titleParts = [
-        reservation.customer_name,
-        `${reservation.guests} pax`,
-        tableName ? `Tavolo ${tableName}` : null,
-      ].filter(Boolean);
+        reservation.customer_name ?? 'Prenotazione',
+        `${reservation.people_count ?? 0} pax`,
+        tableName ? `Tavolo ${tableName}` : 'Senza tavolo',
+      ];
+
+      const active = isReservationActive(reservation.status);
 
       return {
         id: reservation.id,
         title: titleParts.join(' • '),
         start: reservation.reservation_time,
         allDay: false,
-        backgroundColor: reservation.status === 'cancelled' ? '#f3b3b3' : '#111111',
-        borderColor: reservation.status === 'cancelled' ? '#f3b3b3' : '#111111',
-        textColor: reservation.status === 'cancelled' ? '#6a1b1b' : '#ffffff',
+        backgroundColor: active ? '#111111' : '#f3b3b3',
+        borderColor: active ? '#111111' : '#f3b3b3',
+        textColor: active ? '#ffffff' : '#6a1b1b',
       };
     });
   }, [reservations, tables]);
@@ -275,20 +313,22 @@ export default function CalendarPage() {
       .sort((a, b) => a.reservation_time.localeCompare(b.reservation_time));
   }, [reservations, selectedDate]);
 
-  const totalGuestsOfSelectedDay = useMemo(() => {
-    return reservationsOfSelectedDate
-      .filter((r) => r.status !== 'cancelled')
-      .reduce((sum, r) => sum + Number(r.guests || 0), 0);
+  const activeReservationsOfSelectedDate = useMemo(() => {
+    return reservationsOfSelectedDate.filter((r) => isReservationActive(r.status));
   }, [reservationsOfSelectedDate]);
+
+  const totalGuestsOfSelectedDay = useMemo(() => {
+    return activeReservationsOfSelectedDate.reduce((sum, r) => sum + Number(r.people_count || 0), 0);
+  }, [activeReservationsOfSelectedDate]);
 
   function resetForm(date?: string) {
     setEditingReservationId(null);
     setForm({
       customer_name: '',
-      customer_phone: '',
+      phone: '',
       reservation_date: date ?? selectedDate ?? toDateInputValue(new Date()),
       reservation_hour: '20:00',
-      guests: 2,
+      people_count: 2,
       table_id: '',
       notes: '',
     });
@@ -301,14 +341,14 @@ export default function CalendarPage() {
     setModalOpen(true);
   }
 
-  function openEditReservation(reservation: Reservation) {
+  function openEditReservation(reservation: ReservationRow) {
     setEditingReservationId(reservation.id);
     setForm({
       customer_name: reservation.customer_name ?? '',
-      customer_phone: reservation.customer_phone ?? '',
+      phone: reservation.phone ?? '',
       reservation_date: getDatePart(reservation.reservation_time),
       reservation_hour: getTimePart(reservation.reservation_time),
-      guests: reservation.guests ?? 2,
+      people_count: reservation.people_count ?? 2,
       table_id: reservation.table_id ?? '',
       notes: reservation.notes ?? '',
     });
@@ -332,12 +372,12 @@ export default function CalendarPage() {
 
     const payload = {
       customer_name: form.customer_name.trim(),
-      customer_phone: form.customer_phone.trim() || null,
+      phone: form.phone.trim() || null,
       reservation_time: buildReservationDateTime(form.reservation_date, form.reservation_hour),
-      guests: Number(form.guests),
+      people_count: Number(form.people_count),
       table_id: form.table_id || null,
       notes: form.notes.trim() || null,
-      status: 'confirmed' as ReservationStatus,
+      status: 'confermata',
     };
 
     if (!payload.customer_name) {
@@ -373,6 +413,7 @@ export default function CalendarPage() {
       loadedRange?.end ?? toLocalDateTimeString(addDays(endOfMonth(new Date(form.reservation_date)), 14));
 
     await loadReservationsRange(refreshStart, refreshEnd);
+    await loadTables();
 
     setModalOpen(false);
     setSaving(false);
@@ -405,7 +446,7 @@ export default function CalendarPage() {
   async function handleSoftCancelReservation(id: string) {
     const { error } = await supabase
       .from('reservations')
-      .update({ status: 'cancelled' })
+      .update({ status: 'annullata' })
       .eq('id', id);
 
     if (error) {
@@ -415,7 +456,7 @@ export default function CalendarPage() {
     }
 
     setReservations((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, status: 'cancelled' } : r))
+      prev.map((r) => (r.id === id ? { ...r, status: 'annullata' } : r))
     );
   }
 
@@ -628,7 +669,7 @@ export default function CalendarPage() {
                   }}
                   buttonText={{
                     today: 'Oggi',
-                    day: 'Giorno',
+                    timeGridDay: 'Giorno',
                     listWeek: 'Settimana',
                   }}
                   initialDate={selectedDate}
@@ -735,10 +776,10 @@ export default function CalendarPage() {
                   }}
                 >
                   <div style={{ fontSize: 12, color: UI.textSoft, fontWeight: 700 }}>
-                    Prenotazioni
+                    Prenotazioni attive
                   </div>
                   <div style={{ fontSize: 24, fontWeight: 800 }}>
-                    {reservationsOfSelectedDate.length}
+                    {activeReservationsOfSelectedDate.length}
                   </div>
                 </div>
 
@@ -811,6 +852,7 @@ export default function CalendarPage() {
                 <div style={{ display: 'grid', gap: 10 }}>
                   {reservationsOfSelectedDate.map((reservation) => {
                     const tableName = tables.find((t) => t.id === reservation.table_id)?.name ?? '—';
+                    const active = isReservationActive(reservation.status);
 
                     return (
                       <div
@@ -819,8 +861,8 @@ export default function CalendarPage() {
                           border: `1px solid ${UI.border}`,
                           borderRadius: 10,
                           padding: 12,
-                          background: reservation.status === 'cancelled' ? '#fff5f5' : '#fff',
-                          opacity: reservation.status === 'cancelled' ? 0.75 : 1,
+                          background: active ? '#fff' : '#fff5f5',
+                          opacity: active ? 1 : 0.75,
                         }}
                       >
                         <div
@@ -834,17 +876,17 @@ export default function CalendarPage() {
                         >
                           <div style={{ display: 'grid', gap: 4 }}>
                             <div style={{ fontWeight: 800, fontSize: 16 }}>
-                              {reservation.customer_name}
+                              {reservation.customer_name ?? 'Senza nome'}
                             </div>
                             <div style={{ color: UI.textSoft, fontSize: 13, fontWeight: 600 }}>
                               {formatHumanDateTime(reservation.reservation_time)}
                             </div>
                             <div style={{ color: UI.textSoft, fontSize: 13 }}>
-                              {reservation.guests} coperti • Tavolo {tableName}
+                              {reservation.people_count ?? 0} coperti • Tavolo {tableName}
                             </div>
-                            {reservation.customer_phone ? (
+                            {reservation.phone ? (
                               <div style={{ color: UI.textSoft, fontSize: 13 }}>
-                                Tel: {reservation.customer_phone}
+                                Tel: {reservation.phone}
                               </div>
                             ) : null}
                             {reservation.notes ? (
@@ -852,10 +894,15 @@ export default function CalendarPage() {
                                 Note: {reservation.notes}
                               </div>
                             ) : null}
+                            {!active ? (
+                              <div style={{ color: UI.danger, fontSize: 12, fontWeight: 800 }}>
+                                Prenotazione annullata
+                              </div>
+                            ) : null}
                           </div>
 
                           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                            {reservation.status !== 'cancelled' && (
+                            {active && (
                               <button
                                 type="button"
                                 onClick={() => handleSoftCancelReservation(reservation.id)}
@@ -1006,8 +1053,8 @@ export default function CalendarPage() {
               <div style={{ display: 'grid', gap: 6 }}>
                 <label style={{ fontSize: 13, fontWeight: 700 }}>Telefono</label>
                 <input
-                  value={form.customer_phone}
-                  onChange={(e) => setForm((prev) => ({ ...prev, customer_phone: e.target.value }))}
+                  value={form.phone}
+                  onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
                   placeholder="Facoltativo"
                   style={{
                     minHeight: 44,
@@ -1063,7 +1110,7 @@ export default function CalendarPage() {
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+                  gridTemplateColumns: isMobile ? '1fr' : '1fr',
                   gap: 12,
                 }}
               >
@@ -1072,9 +1119,9 @@ export default function CalendarPage() {
                   <input
                     type="number"
                     min={1}
-                    value={form.guests}
+                    value={form.people_count}
                     onChange={(e) =>
-                      setForm((prev) => ({ ...prev, guests: Number(e.target.value) || 1 }))
+                      setForm((prev) => ({ ...prev, people_count: Number(e.target.value) || 1 }))
                     }
                     style={{
                       minHeight: 44,
@@ -1088,38 +1135,45 @@ export default function CalendarPage() {
                 <div style={{ display: 'grid', gap: 8 }}>
                   <label style={{ fontSize: 13, fontWeight: 700 }}>Tavolo</label>
 
-                  <select
-                    key={`table-select-${tables.length}`}
-                    value={form.table_id || ''}
-                    onChange={(e) => setForm((prev) => ({ ...prev, table_id: e.target.value }))}
-                    disabled={tables.length === 0}
+                  <div
                     style={{
-                      minHeight: 44,
+                      padding: '10px 12px',
                       borderRadius: 8,
                       border: `1px solid ${UI.border}`,
-                      padding: '10px 12px',
-                      background: tables.length === 0 ? '#f8f8f8' : '#fff',
-                      color: UI.text,
+                      background: '#fff',
+                      color: form.table_id ? UI.text : UI.textSoft,
+                      fontSize: 14,
+                      fontWeight: 700,
                     }}
                   >
-                    <option value="">
-                      {tables.length === 0 ? 'Nessun tavolo disponibile' : 'Seleziona tavolo'}
-                    </option>
-
-                    {tables.map((table) => (
-                      <option key={table.id} value={table.id}>
-                        {table.name}{table.seats ? ` • ${table.seats} posti` : ''}
-                      </option>
-                    ))}
-                  </select>
+                    {form.table_id
+                      ? `Tavolo selezionato: ${tables.find((t) => t.id === form.table_id)?.name ?? '—'}`
+                      : 'Nessun tavolo selezionato'}
+                  </div>
 
                   <div
                     style={{
                       display: 'flex',
                       flexWrap: 'wrap',
-                      gap: 6,
+                      gap: 8,
                     }}
                   >
+                    <button
+                      type="button"
+                      onClick={() => setForm((prev) => ({ ...prev, table_id: '' }))}
+                      style={{
+                        padding: '8px 10px',
+                        borderRadius: 999,
+                        border: form.table_id === '' ? '1px solid #111' : `1px solid ${UI.border}`,
+                        background: form.table_id === '' ? '#111' : '#fff',
+                        color: form.table_id === '' ? '#fff' : UI.text,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Nessun tavolo
+                    </button>
+
                     {tables.map((table) => {
                       const active = form.table_id === table.id;
 
