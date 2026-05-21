@@ -1,633 +1,949 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import FullCalendar from '@fullcalendar/react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin, { DateClickArg } from '@fullcalendar/interaction';
 import listPlugin from '@fullcalendar/list';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase/client';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL as string,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
-);
+const FullCalendar = dynamic(() => import('@fullcalendar/react'), {
+  ssr: false,
+  loading: () => (
+    <div
+      style={{
+        padding: 16,
+        border: '1px solid #d9d9d9',
+        borderRadius: 10,
+        background: '#fff',
+        color: '#111',
+        fontWeight: 600,
+      }}
+    >
+      Caricamento calendario…
+    </div>
+  ),
+});
 
-type Table = {
-  id: string;
-  name: string;
-  status: 'libero' | 'prenotato' | 'occupato';
-};
+type ReservationStatus = 'confirmed' | 'cancelled';
 
 type Reservation = {
   id: string;
-  table_id: string | null;
   customer_name: string;
-  people_count: number | null;
+  customer_phone: string | null;
   reservation_time: string;
-  phone: string | null;
+  guests: number;
+  table_id: string | null;
   notes: string | null;
-  status: string | null;
-  created_at: string | null;
+  status: ReservationStatus;
+  created_at?: string;
+};
+
+type TableRow = {
+  id: string;
+  name: string;
+  seats?: number | null;
 };
 
 type AppSettingsRow = {
   key: string;
   value_number: number | null;
-  updated_at?: string;
+};
+
+type ReservationForm = {
+  customer_name: string;
+  customer_phone: string;
+  reservation_date: string;
+  reservation_hour: string;
+  guests: number;
+  table_id: string;
+  notes: string;
+  status: ReservationStatus;
 };
 
 const UI = {
-  bg: '#ffffff',
+  bg: '#f6f3ee',
   surface: '#ffffff',
-  border: '#dddddd',
-  borderSoft: '#eeeeee',
-  text: '#111111',
-  textMuted: '#666666',
-  primary: '#01696f',
-  primaryText: '#ffffff',
-  success: '#059669',
-  warning: '#d97706',
-  danger: '#dc2626',
-  dangerText: '#ffffff',
-  inputBg: '#ffffff',
-  inputBorder: '#cccccc',
-  overlay: 'rgba(0,0,0,0.35)',
+  surfaceAlt: '#faf8f5',
+  border: '#ddd6cf',
+  text: '#161616',
+  textSoft: '#6f6a64',
+  primary: '#111111',
+  success: '#1f7a1f',
+  danger: '#b42318',
+  warning: '#a15c00',
 };
 
-const labelStyle: React.CSSProperties = {
-  display: 'block',
-  fontSize: 12,
-  fontWeight: 600,
-  marginBottom: 4,
-  color: UI.text,
-};
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
 
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '9px 10px',
-  borderRadius: 6,
-  border: `1px solid ${UI.inputBorder}`,
-  fontSize: 14,
-  color: UI.text,
-  backgroundColor: UI.inputBg,
-};
+function pad2(value: number) {
+  return String(value).padStart(2, '0');
+}
 
-const textareaStyle: React.CSSProperties = {
-  ...inputStyle,
-  minHeight: 80,
-  resize: 'vertical',
-};
+function toDateInputValue(date: Date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
 
-function toDateTimeLocalString(value: string) {
+function toTimeInputValue(date: Date) {
+  return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+}
+
+function toLocalDateTimeString(date: Date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(date.getHours())}:${pad2(date.getMinutes())}:00`;
+}
+
+function getDatePart(isoString: string) {
+  return isoString.slice(0, 10);
+}
+
+function getTimePart(isoString: string) {
+  return isoString.slice(11, 16);
+}
+
+function buildReservationDateTime(date: string, hour: string) {
+  return `${date}T${hour}:00`;
+}
+
+function startOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1, 0, 0, 0);
+}
+
+function endOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59);
+}
+
+function formatHumanDate(value: string) {
   const d = new Date(value);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const hours = String(d.getHours()).padStart(2, '0');
-  const minutes = String(d.getMinutes()).padStart(2, '0');
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
-}
-
-function getDatePart(value: string) {
-  return value.slice(0, 10);
-}
-
-function getTimePart(value: string) {
-  const local = toDateTimeLocalString(value);
-  return local.slice(11, 16);
-}
-
-function mergeDateAndTime(dateStr: string, timeStr: string) {
-  return `${dateStr}T${timeStr}`;
-}
-
-function sameDay(dateTimeA: string, dateTimeB: string) {
-  return dateTimeA.slice(0, 10) === dateTimeB.slice(0, 10);
-}
-
-function formatDateLabel(dateStr: string) {
-  if (!dateStr) return '-';
-  const d = new Date(`${dateStr}T00:00:00`);
   return d.toLocaleDateString('it-IT', {
-    weekday: 'long',
+    weekday: 'short',
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
   });
 }
 
-export default function CalendarPage() {
-  const router = useRouter();
+function formatHumanDateTime(value: string) {
+  const d = new Date(value);
+  return d.toLocaleString('it-IT', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
 
+export default function CalendarPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
-  const [tables, setTables] = useState<Table[]>([]);
+  const [tables, setTables] = useState<TableRow[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
-  const [venueCapacity, setVenueCapacity] = useState(0);
+  const [venueCapacity, setVenueCapacity] = useState<number>(0);
 
-  const [showModal, setShowModal] = useState(false);
-  const [editingReservationId, setEditingReservationId] = useState<string | null>(
-    null
+  const [selectedDate, setSelectedDate] = useState<string>(toDateInputValue(new Date()));
+  const [currentView, setCurrentView] = useState<'dayGridMonth' | 'timeGridDay' | 'listWeek'>(
+    typeof window !== 'undefined' && window.innerWidth < 768 ? 'listWeek' : 'dayGridMonth'
   );
 
-  const [selectedDate, setSelectedDate] = useState('');
-  const [arrivalTime, setArrivalTime] = useState('20:00');
-  const [customerName, setCustomerName] = useState('');
-  const [peopleCount, setPeopleCount] = useState('2');
-  const [phone, setPhone] = useState('');
-  const [selectedTableId, setSelectedTableId] = useState('');
-  const [notes, setNotes] = useState('');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingReservationId, setEditingReservationId] = useState<string | null>(null);
+
+  const [form, setForm] = useState<ReservationForm>({
+    customer_name: '',
+    customer_phone: '',
+    reservation_date: toDateInputValue(new Date()),
+    reservation_hour: '20:00',
+    guests: 2,
+    table_id: '',
+    notes: '',
+    status: 'confirmed',
+  });
+
+  const [loadedRange, setLoadedRange] = useState<{ start: string; end: string } | null>(null);
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const { data: tablesData, error: tablesError } = await supabase
-          .from('tables')
-          .select('*')
-          .order('name', { ascending: true });
-
-        if (tablesError) {
-          console.error('Errore caricamento tavoli', tablesError);
-          return;
-        }
-
-        const { data: reservationsData, error: reservationsError } = await supabase
-          .from('reservations')
-          .select('*')
-          .order('reservation_time', { ascending: true });
-
-        if (reservationsError) {
-          console.error('Errore caricamento prenotazioni', reservationsError);
-          return;
-        }
-
-        const { data: settingsData, error: settingsError } = await supabase
-          .from('app_settings')
-          .select('key, value_number')
-          .eq('key', 'max_capacity')
-          .single();
-
-        if (settingsError) {
-          console.error('Errore caricamento capienza massima', settingsError);
-        }
-
-        setTables((tablesData as Table[]) ?? []);
-        setReservations((reservationsData as Reservation[]) ?? []);
-        setVenueCapacity(
-          Number((settingsData as AppSettingsRow | null)?.value_number ?? 0)
-        );
-      } finally {
-        setLoading(false);
-      }
+    const onResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
     };
 
-    loadData();
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  const resetForm = () => {
-    setEditingReservationId(null);
-    setSelectedDate('');
-    setArrivalTime('20:00');
-    setCustomerName('');
-    setPeopleCount('2');
-    setPhone('');
-    setSelectedTableId('');
-    setNotes('');
-  };
+  const loadStaticData = useCallback(async () => {
+    const [{ data: tablesData, error: tablesError }, { data: settingsData, error: settingsError }] =
+      await Promise.all([
+        supabase.from('tables').select('id, name, seats').order('name', { ascending: true }),
+        supabase.from('app_settings').select('key, value_number').eq('key', 'max_capacity').single(),
+      ]);
 
-  const openNewReservation = (date: Date) => {
-    resetForm();
+    if (tablesError) {
+      console.error('Errore caricamento tavoli', tablesError);
+    } else {
+      setTables((tablesData as TableRow[]) ?? []);
+    }
 
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    if (settingsError) {
+      console.error('Errore caricamento capienza massima', settingsError);
+    } else {
+      setVenueCapacity(Number((settingsData as AppSettingsRow | null)?.value_number ?? 0));
+    }
+  }, []);
 
-    setSelectedDate(`${year}-${month}-${day}`);
-    setArrivalTime('20:00');
-    setShowModal(true);
-  };
-
-  const openEditReservation = (reservation: Reservation) => {
-    setEditingReservationId(reservation.id);
-    setSelectedDate(getDatePart(reservation.reservation_time));
-    setArrivalTime(getTimePart(reservation.reservation_time));
-    setCustomerName(reservation.customer_name ?? '');
-    setPeopleCount(String(reservation.people_count ?? 1));
-    setPhone(reservation.phone ?? '');
-    setSelectedTableId(reservation.table_id ?? '');
-    setNotes(reservation.notes ?? '');
-    setShowModal(true);
-  };
-
-  const visibleReservations = useMemo(() => {
-    return reservations.filter((r) => r.status !== 'annullata');
-  }, [reservations]);
-
-  const busyTableIds = useMemo(() => {
-    if (!selectedDate) return [];
-
-    return reservations
-      .filter(
-        (r) =>
-          r.id !== editingReservationId &&
-          r.status !== 'annullata' &&
-          sameDay(r.reservation_time, `${selectedDate}T00:00`)
+  const loadReservationsRange = useCallback(async (start: string, end: string) => {
+    const { data, error } = await supabase
+      .from('reservations')
+      .select(
+        'id, customer_name, customer_phone, reservation_time, guests, table_id, notes, status, created_at'
       )
-      .map((r) => r.table_id)
-      .filter(Boolean) as string[];
-  }, [reservations, selectedDate, editingReservationId]);
+      .gte('reservation_time', start)
+      .lte('reservation_time', end)
+      .order('reservation_time', { ascending: true });
 
-  const bookedSeatsForSelectedDay = useMemo(() => {
-    if (!selectedDate) return 0;
+    if (error) {
+      console.error('Errore caricamento prenotazioni', error);
+      return;
+    }
 
-    return reservations
-      .filter(
-        (r) =>
-          r.id !== editingReservationId &&
-          r.status !== 'annullata' &&
-          sameDay(r.reservation_time, `${selectedDate}T00:00`)
-      )
-      .reduce((sum, r) => sum + Number(r.people_count ?? 0), 0);
-  }, [reservations, selectedDate, editingReservationId]);
+    setReservations((data as Reservation[]) ?? []);
+    setLoadedRange({ start, end });
+  }, []);
 
-  const parsedCurrentPeopleCount = Number(peopleCount || 0);
-  const projectedBookedSeats = bookedSeatsForSelectedDay + (parsedCurrentPeopleCount || 0);
-  const remainingSeats =
-    venueCapacity > 0 ? Math.max(venueCapacity - bookedSeatsForSelectedDay, 0) : 0;
-  const remainingSeatsAfterSave =
-    venueCapacity > 0 ? venueCapacity - projectedBookedSeats : 0;
+  useEffect(() => {
+    const run = async () => {
+      setLoading(true);
+
+      const now = new Date();
+      const initialStart = toLocalDateTimeString(addDays(startOfMonth(now), -14));
+      const initialEnd = toLocalDateTimeString(addDays(endOfMonth(addDays(now, 60)), 14));
+
+      await Promise.all([loadStaticData(), loadReservationsRange(initialStart, initialEnd)]);
+      setLoading(false);
+    };
+
+    run();
+  }, [loadReservationsRange, loadStaticData]);
 
   const calendarEvents = useMemo(() => {
-    return visibleReservations.map((reservation) => {
-      const table = tables.find((t) => t.id === reservation.table_id);
-      const tableName = table?.name ?? 'Senza tavolo';
+    return reservations.map((reservation) => {
+      const tableName = tables.find((t) => t.id === reservation.table_id)?.name;
+      const titleParts = [
+        reservation.customer_name,
+        `${reservation.guests} pax`,
+        tableName ? `Tavolo ${tableName}` : null,
+      ].filter(Boolean);
 
       return {
         id: reservation.id,
-        title: `${getTimePart(reservation.reservation_time)} • ${reservation.customer_name} • ${tableName} • ${reservation.people_count ?? 0} persone`,
+        title: titleParts.join(' • '),
         start: reservation.reservation_time,
         allDay: false,
-        backgroundColor: UI.primary,
-        borderColor: UI.primary,
-        textColor: '#ffffff',
+        backgroundColor: reservation.status === 'cancelled' ? '#f3b3b3' : '#111111',
+        borderColor: reservation.status === 'cancelled' ? '#f3b3b3' : '#111111',
+        textColor: reservation.status === 'cancelled' ? '#6a1b1b' : '#ffffff',
       };
     });
-  }, [visibleReservations, tables]);
+  }, [reservations, tables]);
 
-  const handleDateClick = (arg: DateClickArg) => {
+  const reservationsOfSelectedDate = useMemo(() => {
+    return reservations
+      .filter((r) => getDatePart(r.reservation_time) === selectedDate)
+      .sort((a, b) => a.reservation_time.localeCompare(b.reservation_time));
+  }, [reservations, selectedDate]);
+
+  function resetForm(date?: string) {
+    setEditingReservationId(null);
+    setForm({
+      customer_name: '',
+      customer_phone: '',
+      reservation_date: date ?? selectedDate ?? toDateInputValue(new Date()),
+      reservation_hour: '20:00',
+      guests: 2,
+      table_id: '',
+      notes: '',
+      status: 'confirmed',
+    });
+  }
+
+  function openNewReservation(date?: Date) {
+    const pickedDate = date ? toDateInputValue(date) : selectedDate;
+    setSelectedDate(pickedDate);
+    resetForm(pickedDate);
+    setModalOpen(true);
+  }
+
+  function openEditReservation(reservation: Reservation) {
+    setEditingReservationId(reservation.id);
+    setForm({
+      customer_name: reservation.customer_name ?? '',
+      customer_phone: reservation.customer_phone ?? '',
+      reservation_date: getDatePart(reservation.reservation_time),
+      reservation_hour: getTimePart(reservation.reservation_time),
+      guests: reservation.guests ?? 2,
+      table_id: reservation.table_id ?? '',
+      notes: reservation.notes ?? '',
+      status: reservation.status ?? 'confirmed',
+    });
+    setModalOpen(true);
+  }
+
+  function handleDateClick(arg: DateClickArg) {
+    const clickedDate = arg.dateStr.slice(0, 10);
+    setSelectedDate(clickedDate);
+
+    if (isMobile && currentView !== 'timeGridDay') {
+      setCurrentView('timeGridDay');
+    }
+
     openNewReservation(arg.date);
-  };
+  }
 
-  const handleSaveReservation = async () => {
-    const parsedPeopleCount = Number(peopleCount);
-
-    if (!selectedDate) {
-      alert('Seleziona un giorno dal calendario.');
-      return;
-    }
-
-    if (!arrivalTime) {
-      alert("Inserisci l’orario.");
-      return;
-    }
-
-    if (!customerName.trim()) {
-      alert('Inserisci il nome del cliente.');
-      return;
-    }
-
-    if (!parsedPeopleCount || parsedPeopleCount <= 0) {
-      alert('Inserisci un numero persone valido.');
-      return;
-    }
-
-    if (!phone.trim()) {
-      alert('Inserisci un recapito telefonico.');
-      return;
-    }
-
-    if (!selectedTableId) {
-      alert('Seleziona un tavolo.');
-      return;
-    }
-
-    if (venueCapacity > 0 && projectedBookedSeats > venueCapacity) {
-      alert(
-        `Capienza superata. Posti totali: ${venueCapacity}. Già impegnati: ${bookedSeatsForSelectedDay}. Questa prenotazione porterebbe il totale a ${projectedBookedSeats}.`
-      );
-      return;
-    }
-
-    const reservationDateTime = mergeDateAndTime(selectedDate, arrivalTime);
-
+  async function handleSaveReservation(e: React.FormEvent) {
+    e.preventDefault();
     setSaving(true);
 
-    try {
-      const payload = {
-        customer_name: customerName.trim(),
-        reservation_time: reservationDateTime,
-        people_count: parsedPeopleCount,
-        phone: phone.trim(),
-        table_id: selectedTableId,
-        notes: notes.trim() || null,
-      };
+    const payload = {
+      customer_name: form.customer_name.trim(),
+      customer_phone: form.customer_phone.trim() || null,
+      reservation_time: buildReservationDateTime(form.reservation_date, form.reservation_hour),
+      guests: Number(form.guests),
+      table_id: form.table_id || null,
+      notes: form.notes.trim() || null,
+      status: form.status,
+    };
 
-      if (editingReservationId) {
-        const { data, error } = await supabase
-          .from('reservations')
-          .update(payload)
-          .eq('id', editingReservationId)
-          .select()
-          .single();
-
-        if (error) {
-          console.error('Errore aggiornamento prenotazione', error);
-          alert('Errore durante il salvataggio della prenotazione.');
-          return;
-        }
-
-        const updated = data as Reservation;
-        setReservations((prev) =>
-          prev.map((r) => (r.id === updated.id ? updated : r))
-        );
-      } else {
-        const { data, error } = await supabase
-          .from('reservations')
-          .insert({
-            ...payload,
-            status: 'confermata',
-          })
-          .select()
-          .single();
-
-        if (error) {
-          console.error('Errore creazione prenotazione', error);
-          alert('Errore durante la creazione della prenotazione.');
-          return;
-        }
-
-        const created = data as Reservation;
-        setReservations((prev) =>
-          [...prev, created].sort((a, b) =>
-            a.reservation_time.localeCompare(b.reservation_time)
-          )
-        );
-      }
-
-      setShowModal(false);
-      resetForm();
-    } finally {
+    if (!payload.customer_name) {
+      alert('Inserisci il nome cliente');
       setSaving(false);
+      return;
     }
-  };
 
-  const handleDeleteReservation = async () => {
-    if (!editingReservationId) return;
+    if (!payload.reservation_time) {
+      alert('Inserisci data e orario');
+      setSaving(false);
+      return;
+    }
 
-    const confirmed = window.confirm('Vuoi davvero annullare questa prenotazione?');
-    if (!confirmed) return;
+    let error: any = null;
 
-    setSaving(true);
-    try {
-      const { data, error } = await supabase
+    if (editingReservationId) {
+      const result = await supabase
         .from('reservations')
-        .update({ status: 'annullata' })
-        .eq('id', editingReservationId)
-        .select()
-        .single();
+        .update(payload)
+        .eq('id', editingReservationId);
 
-      if (error) {
-        console.error('Errore annullamento prenotazione', error);
-        alert('Errore durante l’annullamento della prenotazione.');
-        return;
-      }
-
-      const updated = data as Reservation;
-      setReservations((prev) =>
-        prev.map((r) => (r.id === updated.id ? updated : r))
-      );
-      setShowModal(false);
-      resetForm();
-    } finally {
-      setSaving(false);
+      error = result.error;
+    } else {
+      const result = await supabase.from('reservations').insert(payload);
+      error = result.error;
     }
-  };
 
-  if (loading) {
-    return (
-      <div style={{ padding: 16, color: UI.text }}>
-        Caricamento calendario…
-      </div>
+    if (error) {
+      console.error('Errore salvataggio prenotazione', error);
+      alert('Errore durante il salvataggio della prenotazione');
+      setSaving(false);
+      return;
+    }
+
+    const refreshStart =
+      loadedRange?.start ?? toLocalDateTimeString(addDays(startOfMonth(new Date(form.reservation_date)), -14));
+    const refreshEnd =
+      loadedRange?.end ?? toLocalDateTimeString(addDays(endOfMonth(new Date(form.reservation_date)), 14));
+
+    await loadReservationsRange(refreshStart, refreshEnd);
+
+    setModalOpen(false);
+    setSaving(false);
+  }
+
+  async function handleDeleteReservation(id: string) {
+    const confirmDelete = window.confirm('Vuoi davvero cancellare questa prenotazione?');
+    if (!confirmDelete) return;
+
+    setDeleting(true);
+
+    const { error } = await supabase.from('reservations').delete().eq('id', id);
+
+    if (error) {
+      console.error('Errore cancellazione prenotazione', error);
+      alert('Errore durante la cancellazione');
+      setDeleting(false);
+      return;
+    }
+
+    setReservations((prev) => prev.filter((r) => r.id !== id));
+    if (editingReservationId === id) {
+      setModalOpen(false);
+    }
+
+    setDeleting(false);
+  }
+
+  async function handleSoftCancelReservation(id: string) {
+    const { error } = await supabase
+      .from('reservations')
+      .update({ status: 'cancelled' })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Errore annullamento prenotazione', error);
+      alert('Errore durante l’annullamento');
+      return;
+    }
+
+    setReservations((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, status: 'cancelled' } : r))
     );
   }
 
+  const totalGuestsOfSelectedDay = useMemo(() => {
+    return reservationsOfSelectedDate
+      .filter((r) => r.status !== 'cancelled')
+      .reduce((sum, r) => sum + Number(r.guests || 0), 0);
+  }, [reservationsOfSelectedDate]);
+
   return (
-    <main
+    <div
       style={{
-        padding: 16,
-        backgroundColor: UI.bg,
-        color: UI.text,
         minHeight: '100vh',
+        background: UI.bg,
+        color: UI.text,
+        padding: isMobile ? 12 : 20,
       }}
     >
       <div
         style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 12,
-          flexWrap: 'wrap',
-          marginBottom: 16,
+          maxWidth: 1400,
+          margin: '0 auto',
+          display: 'grid',
+          gap: 16,
         }}
       >
-        <div>
-          <h1 style={{ margin: 0, fontSize: 26 }}>Calendario prenotazioni</h1>
-          <div style={{ marginTop: 4, fontSize: 13, color: UI.textMuted }}>
-            Clicca un giorno per creare una prenotazione, clicca una prenotazione per modificarla.
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: isMobile ? 'stretch' : 'center',
+            flexDirection: isMobile ? 'column' : 'row',
+            gap: 12,
+          }}
+        >
+          <div>
+            <h1 style={{ fontSize: isMobile ? 24 : 30, fontWeight: 800, marginBottom: 4 }}>
+              Calendar
+            </h1>
+            <p style={{ color: UI.textSoft, fontSize: 14 }}>
+              Prenotazioni sala con vista mese, giorno e lista.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => openNewReservation(new Date())}
+              style={{
+                padding: '10px 14px',
+                minHeight: 42,
+                borderRadius: 10,
+                border: '1px solid #111',
+                background: '#111',
+                color: '#fff',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Nuova prenotazione
+            </button>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            onClick={() => router.push('/staff')}
-            style={{
-              padding: '8px 12px',
-              borderRadius: 6,
-              border: `1px solid ${UI.border}`,
-              backgroundColor: UI.surface,
-              color: UI.text,
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            ← Staff
-          </button>
-
-          <button
-            type="button"
-            onClick={() => router.push('/owner')}
-            style={{
-              padding: '8px 12px',
-              borderRadius: 6,
-              border: `1px solid ${UI.border}`,
-              backgroundColor: UI.surface,
-              color: UI.text,
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            Owner →
-          </button>
-        </div>
-      </div>
-
-      <div
-        style={{
-          display: 'flex',
-          gap: 8,
-          flexWrap: 'wrap',
-          marginBottom: 12,
-        }}
-      >
         <div
           style={{
-            padding: '8px 12px',
-            borderRadius: 999,
-            border: `1px solid ${UI.border}`,
-            backgroundColor: UI.surface,
-            fontSize: 13,
-            fontWeight: 600,
-          }}
-        >
-          Capienza locale: {venueCapacity > 0 ? venueCapacity : 'non impostata'}
-        </div>
-
-        {selectedDate && (
-          <>
-            <div
-              style={{
-                padding: '8px 12px',
-                borderRadius: 999,
-                border: `1px solid ${UI.border}`,
-                backgroundColor: UI.surface,
-                fontSize: 13,
-                fontWeight: 600,
-              }}
-            >
-              Giorno: {formatDateLabel(selectedDate)}
-            </div>
-
-            <div
-              style={{
-                padding: '8px 12px',
-                borderRadius: 999,
-                border: `1px solid ${UI.border}`,
-                backgroundColor: UI.surface,
-                fontSize: 13,
-                fontWeight: 600,
-              }}
-            >
-              Prenotati: {bookedSeatsForSelectedDay}
-            </div>
-
-            <div
-              style={{
-                padding: '8px 12px',
-                borderRadius: 999,
-                border: `1px solid ${UI.border}`,
-                backgroundColor:
-                  venueCapacity > 0 && remainingSeats === 0
-                    ? '#fee2e2'
-                    : '#ecfdf5',
-                color:
-                  venueCapacity > 0 && remainingSeats === 0
-                    ? UI.danger
-                    : UI.success,
-                fontSize: 13,
-                fontWeight: 700,
-              }}
-            >
-              Liberi: {venueCapacity > 0 ? remainingSeats : '-'}
-            </div>
-          </>
-        )}
-      </div>
-
-      <div
-        style={{
-          backgroundColor: UI.surface,
-          border: `1px solid ${UI.border}`,
-          borderRadius: 10,
-          padding: 12,
-          overflow: 'hidden',
-        }}
-      >
-        <FullCalendar
-          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
-          initialView="dayGridMonth"
-          locale="it"
-          headerToolbar={{
-            left: 'prev,next today',
-            center: 'title',
-            right: 'dayGridMonth,timeGridDay,listWeek',
-          }}
-          buttonText={{
-            today: 'Oggi',
-            month: 'Mese',
-            day: 'Giorno',
-            listWeek: 'Prenotazioni lista',
-          }}
-          height="auto"
-          editable={false}
-          selectable={true}
-          dateClick={(arg) => {
-            const clickedDate = arg.dateStr.slice(0, 10);
-            setSelectedDate(clickedDate);
-            handleDateClick(arg);
-          }}
-          eventClick={(arg) => {
-            const reservation = reservations.find((r) => r.id === arg.event.id);
-            if (!reservation) return;
-            setSelectedDate(getDatePart(reservation.reservation_time));
-            openEditReservation(reservation);
-          }}
-          datesSet={(info) => {
-            const currentDate = info.startStr.slice(0, 10);
-            if (info.view.type === 'timeGridDay') {
-              setSelectedDate(currentDate);
-            }
-          }}
-          events={calendarEvents}
-        />
-      </div>
-
-      {showModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: UI.overlay,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 16,
-            zIndex: 1000,
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1.5fr) minmax(320px, 420px)',
+            gap: 16,
+            alignItems: 'start',
           }}
         >
           <div
             style={{
-              width: '100%',
-              maxWidth: 580,
               backgroundColor: UI.surface,
-              borderRadius: 10,
               border: `1px solid ${UI.border}`,
+              borderRadius: 12,
+              padding: isMobile ? 8 : 12,
+              overflow: 'hidden',
+              minHeight: 420,
+            }}
+          >
+            <style>{`
+              .nur-calendar .fc .fc-toolbar {
+                gap: 8px;
+              }
+
+              .nur-calendar .fc .fc-button {
+                border-radius: 8px;
+                padding: 8px 10px;
+                font-size: 12px;
+                font-weight: 700;
+                border: 1px solid ${UI.border};
+                background: ${UI.surface};
+                color: ${UI.text};
+                box-shadow: none;
+              }
+
+              .nur-calendar .fc .fc-button-primary:not(:disabled).fc-button-active,
+              .nur-calendar .fc .fc-button-primary:not(:disabled):active {
+                background: ${UI.primary};
+                border-color: ${UI.primary};
+                color: #fff;
+              }
+
+              .nur-calendar .fc .fc-button-primary:hover {
+                background: #f7f7f7;
+                border-color: ${UI.border};
+                color: ${UI.text};
+              }
+
+              .nur-calendar .fc .fc-toolbar-title {
+                font-size: 18px;
+                font-weight: 800;
+                color: ${UI.text};
+              }
+
+              .nur-calendar .fc .fc-col-header-cell-cushion,
+              .nur-calendar .fc .fc-daygrid-day-number,
+              .nur-calendar .fc .fc-list-day-text,
+              .nur-calendar .fc .fc-list-day-side-text {
+                color: ${UI.text};
+                text-decoration: none;
+                font-weight: 700;
+              }
+
+              .nur-calendar .fc .fc-daygrid-day.fc-day-today,
+              .nur-calendar .fc .fc-timegrid-col.fc-day-today {
+                background: #f6efe8;
+              }
+
+              .nur-calendar .fc .fc-event {
+                border-radius: 8px;
+                padding: 2px 4px;
+              }
+
+              .nur-calendar .fc .fc-daygrid-event-dot {
+                border-color: #111;
+              }
+
+              @media (max-width: 767px) {
+                .nur-calendar .fc .fc-header-toolbar {
+                  display: flex;
+                  flex-direction: column;
+                  align-items: stretch;
+                  gap: 8px;
+                }
+
+                .nur-calendar .fc .fc-toolbar-chunk {
+                  display: flex;
+                  justify-content: center;
+                  flex-wrap: wrap;
+                  gap: 6px;
+                }
+
+                .nur-calendar .fc .fc-toolbar-title {
+                  font-size: 16px;
+                  text-align: center;
+                }
+
+                .nur-calendar .fc .fc-button {
+                  min-height: 40px;
+                  padding: 8px 10px;
+                  font-size: 12px;
+                }
+
+                .nur-calendar .fc .fc-list-event-title,
+                .nur-calendar .fc .fc-list-event-time {
+                  font-size: 13px;
+                }
+              }
+            `}</style>
+
+            <div className="nur-calendar">
+              {loading ? (
+                <div style={{ padding: 16, color: UI.text }}>Caricamento calendario…</div>
+              ) : (
+                <FullCalendar
+                  plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
+                  initialView={isMobile ? 'listWeek' : 'dayGridMonth'}
+                  locale="it"
+                  customButtons={{
+                    newReservation: {
+                      text: 'Nuova',
+                      click: () => openNewReservation(new Date()),
+                    },
+                  }}
+                  headerToolbar={
+                    isMobile
+                      ? {
+                          left: 'prev,next today',
+                          center: 'title',
+                          right: 'newReservation,timeGridDay,listWeek',
+                        }
+                      : {
+                          left: 'prev,next today',
+                          center: 'title',
+                          right: 'newReservation,dayGridMonth,timeGridDay,listWeek',
+                        }
+                  }
+                  buttonText={{
+                    today: 'Oggi',
+                    month: 'Mese',
+                    day: 'Giorno',
+                    listWeek: 'Lista',
+                  }}
+                  initialDate={selectedDate}
+                  height="auto"
+                  editable={false}
+                  selectable
+                  dayMaxEventRows={isMobile ? 2 : 4}
+                  datesSet={async (info) => {
+                    setCurrentView(info.view.type as 'dayGridMonth' | 'timeGridDay' | 'listWeek');
+
+                    const start = info.startStr.slice(0, 19);
+                    const end = info.endStr.slice(0, 19);
+
+                    if (
+                      !loadedRange ||
+                      start < loadedRange.start ||
+                      end > loadedRange.end
+                    ) {
+                      await loadReservationsRange(start, end);
+                    }
+
+                    if (info.view.type === 'timeGridDay') {
+                      setSelectedDate(info.startStr.slice(0, 10));
+                    }
+                  }}
+                  eventTimeFormat={{
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
+                  }}
+                  dateClick={(arg) => {
+                    const clickedDate = arg.dateStr.slice(0, 10);
+                    setSelectedDate(clickedDate);
+                    handleDateClick(arg);
+                  }}
+                  eventClick={(arg) => {
+                    const reservation = reservations.find((r) => r.id === arg.event.id);
+                    if (!reservation) return;
+                    setSelectedDate(getDatePart(reservation.reservation_time));
+                    openEditReservation(reservation);
+                  }}
+                  events={calendarEvents}
+                />
+              )}
+            </div>
+          </div>
+
+          <aside
+            style={{
+              display: 'grid',
+              gap: 12,
+              position: 'relative',
+            }}
+          >
+            <div
+              style={{
+                background: UI.surface,
+                border: `1px solid ${UI.border}`,
+                borderRadius: 12,
+                padding: 14,
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 8,
+                  marginBottom: 8,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <h2 style={{ fontSize: 18, fontWeight: 800 }}>Giorno</h2>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                >
+                  <span style={{ fontSize: 13, fontWeight: 700, color: UI.textSoft }}>
+                    Data
+                  </span>
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    style={{
+                      padding: '8px 10px',
+                      borderRadius: 8,
+                      border: `1px solid ${UI.border}`,
+                      background: '#fff',
+                      color: UI.text,
+                      minHeight: 40,
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                  gap: 8,
+                }}
+              >
+                <div
+                  style={{
+                    background: UI.surfaceAlt,
+                    border: `1px solid ${UI.border}`,
+                    borderRadius: 10,
+                    padding: 10,
+                  }}
+                >
+                  <div style={{ fontSize: 12, color: UI.textSoft, fontWeight: 700 }}>
+                    Prenotazioni
+                  </div>
+                  <div style={{ fontSize: 24, fontWeight: 800 }}>
+                    {reservationsOfSelectedDate.length}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    background: UI.surfaceAlt,
+                    border: `1px solid ${UI.border}`,
+                    borderRadius: 10,
+                    padding: 10,
+                  }}
+                >
+                  <div style={{ fontSize: 12, color: UI.textSoft, fontWeight: 700 }}>
+                    Coperti
+                  </div>
+                  <div style={{ fontSize: 24, fontWeight: 800 }}>
+                    {totalGuestsOfSelectedDay}
+                    {venueCapacity > 0 ? (
+                      <span style={{ fontSize: 12, color: UI.textSoft, marginLeft: 6 }}>
+                        / {venueCapacity}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                background: UI.surface,
+                border: `1px solid ${UI.border}`,
+                borderRadius: 12,
+                padding: 14,
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 8,
+                  marginBottom: 12,
+                }}
+              >
+                <h2 style={{ fontSize: 18, fontWeight: 800 }}>
+                  Lista prenotazioni
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => openNewReservation(new Date(`${selectedDate}T12:00:00`))}
+                  style={{
+                    padding: '8px 10px',
+                    minHeight: 40,
+                    borderRadius: 8,
+                    border: `1px solid ${UI.border}`,
+                    background: '#fff',
+                    color: UI.text,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Aggiungi
+                </button>
+              </div>
+
+              {reservationsOfSelectedDate.length === 0 ? (
+                <div
+                  style={{
+                    padding: 14,
+                    borderRadius: 10,
+                    background: UI.surfaceAlt,
+                    border: `1px dashed ${UI.border}`,
+                    color: UI.textSoft,
+                    fontWeight: 600,
+                    fontSize: 14,
+                  }}
+                >
+                  Nessuna prenotazione per il giorno selezionato.
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {reservationsOfSelectedDate.map((reservation) => {
+                    const tableName = tables.find((t) => t.id === reservation.table_id)?.name ?? '—';
+
+                    return (
+                      <div
+                        key={reservation.id}
+                        style={{
+                          border: `1px solid ${UI.border}`,
+                          borderRadius: 10,
+                          padding: 12,
+                          background: reservation.status === 'cancelled' ? '#fff5f5' : '#fff',
+                          opacity: reservation.status === 'cancelled' ? 0.75 : 1,
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            gap: 10,
+                            alignItems: 'flex-start',
+                            flexWrap: 'wrap',
+                          }}
+                        >
+                          <div style={{ display: 'grid', gap: 4 }}>
+                            <div style={{ fontWeight: 800, fontSize: 16 }}>
+                              {reservation.customer_name}
+                            </div>
+                            <div style={{ color: UI.textSoft, fontSize: 13, fontWeight: 600 }}>
+                              {formatHumanDateTime(reservation.reservation_time)}
+                            </div>
+                            <div style={{ color: UI.textSoft, fontSize: 13 }}>
+                              {reservation.guests} coperti • Tavolo {tableName}
+                            </div>
+                            {reservation.customer_phone ? (
+                              <div style={{ color: UI.textSoft, fontSize: 13 }}>
+                                Tel: {reservation.customer_phone}
+                              </div>
+                            ) : null}
+                            {reservation.notes ? (
+                              <div style={{ color: UI.textSoft, fontSize: 13 }}>
+                                Note: {reservation.notes}
+                              </div>
+                            ) : null}
+                          </div>
+
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            {reservation.status !== 'cancelled' && (
+                              <button
+                                type="button"
+                                onClick={() => handleSoftCancelReservation(reservation.id)}
+                                style={{
+                                  minHeight: 40,
+                                  padding: '8px 10px',
+                                  borderRadius: 8,
+                                  border: '1px solid #f0c5c5',
+                                  background: '#fff5f5',
+                                  color: UI.danger,
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Annulla
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => openEditReservation(reservation)}
+                              style={{
+                                minHeight: 40,
+                                padding: '8px 10px',
+                                borderRadius: 8,
+                                border: `1px solid ${UI.border}`,
+                                background: '#fff',
+                                color: UI.text,
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Modifica
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteReservation(reservation.id)}
+                              disabled={deleting}
+                              style={{
+                                minHeight: 40,
+                                padding: '8px 10px',
+                                borderRadius: 8,
+                                border: '1px solid #f0c5c5',
+                                background: '#fff',
+                                color: UI.danger,
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Elimina
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      {modalOpen && (
+        <div
+          onClick={() => setModalOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.35)',
+            display: 'flex',
+            alignItems: isMobile ? 'flex-end' : 'center',
+            justifyContent: 'center',
+            padding: isMobile ? 0 : 16,
+            zIndex: 1000,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: 560,
+              background: '#fff',
+              borderTopLeftRadius: isMobile ? 18 : 12,
+              borderTopRightRadius: isMobile ? 18 : 12,
+              borderBottomLeftRadius: isMobile ? 0 : 12,
+              borderBottomRightRadius: isMobile ? 0 : 12,
               padding: 16,
+              border: `1px solid ${UI.border}`,
               maxHeight: '90vh',
               overflowY: 'auto',
             }}
@@ -642,240 +958,247 @@ export default function CalendarPage() {
               }}
             >
               <div>
-                <h2 style={{ margin: 0, fontSize: 20 }}>
+                <h3 style={{ fontSize: 20, fontWeight: 800 }}>
+                  {editingReservationId ? 'Modifica prenotazione' : 'Nuova prenotazione'}
+                </h3>
+                <div style={{ color: UI.textSoft, fontSize: 13 }}>
                   {editingReservationId
-                    ? 'Modifica prenotazione'
-                    : 'Nuova prenotazione'}
-                </h2>
-                <div
-                  style={{ fontSize: 12, color: UI.textMuted, marginTop: 3 }}
-                >
-                  Giorno selezionato: {selectedDate || '-'}
+                    ? 'Aggiorna i dati della prenotazione'
+                    : 'Inserisci una nuova prenotazione'}
                 </div>
               </div>
 
               <button
                 type="button"
-                onClick={() => {
-                  setShowModal(false);
-                  resetForm();
-                }}
+                onClick={() => setModalOpen(false)}
                 style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 999,
+                  minHeight: 40,
+                  minWidth: 40,
+                  borderRadius: 8,
                   border: `1px solid ${UI.border}`,
-                  backgroundColor: UI.surface,
-                  color: UI.text,
-                  fontSize: 16,
+                  background: '#fff',
+                  fontWeight: 800,
                   cursor: 'pointer',
                 }}
               >
-                ✕
+                ×
               </button>
             </div>
 
-{selectedDate && venueCapacity > 0 && (
-  <div
-    style={{
-      marginBottom: 14,
-      padding: 12,
-      borderRadius: 8,
-      border: `1px solid ${UI.borderSoft}`,
-      backgroundColor:
-        remainingSeatsAfterSave < 0 ? '#fee2e2' : '#f0fdf4',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 12,
-      flexWrap: 'wrap',
-    }}
-  >
-    <div
-      style={{
-        fontSize: 14,
-        fontWeight: 700,
-        color: UI.text,
-      }}
-    >
-      Disponibilità del giorno
-    </div>
-
-    <div
-      style={{
-        fontSize: 24,
-        fontWeight: 800,
-        color: remainingSeatsAfterSave < 0 ? UI.danger : UI.success,
-        lineHeight: 1,
-      }}
-    >
-      {Math.max(remainingSeatsAfterSave, 0)}
-    </div>
-  </div>
-)}
-
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                gap: 12,
-              }}
-            >
-              <div>
-                <label style={labelStyle}>Orario</label>
+            <form onSubmit={handleSaveReservation} style={{ display: 'grid', gap: 12 }}>
+              <div style={{ display: 'grid', gap: 6 }}>
+                <label style={{ fontSize: 13, fontWeight: 700 }}>Nome cliente</label>
                 <input
-                  type="time"
-                  value={arrivalTime}
-                  onChange={(e) => setArrivalTime(e.target.value)}
-                  style={inputStyle}
+                  value={form.customer_name}
+                  onChange={(e) => setForm((prev) => ({ ...prev, customer_name: e.target.value }))}
+                  placeholder="Es. Rossi"
+                  style={{
+                    minHeight: 44,
+                    borderRadius: 8,
+                    border: `1px solid ${UI.border}`,
+                    padding: '10px 12px',
+                  }}
                 />
               </div>
 
-              <div>
-                <label style={labelStyle}>Nome cliente</label>
+              <div style={{ display: 'grid', gap: 6 }}>
+                <label style={{ fontSize: 13, fontWeight: 700 }}>Telefono</label>
                 <input
-                  type="text"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="Es. Mario Rossi"
-                  style={inputStyle}
+                  value={form.customer_phone}
+                  onChange={(e) => setForm((prev) => ({ ...prev, customer_phone: e.target.value }))}
+                  placeholder="Facoltativo"
+                  style={{
+                    minHeight: 44,
+                    borderRadius: 8,
+                    border: `1px solid ${UI.border}`,
+                    padding: '10px 12px',
+                  }}
                 />
               </div>
 
-              <div>
-                <label style={labelStyle}>Numero persone</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={peopleCount}
-                  onChange={(e) => setPeopleCount(e.target.value)}
-                  style={inputStyle}
-                />
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+                  gap: 12,
+                }}
+              >
+                <div style={{ display: 'grid', gap: 6 }}>
+                  <label style={{ fontSize: 13, fontWeight: 700 }}>Data</label>
+                  <input
+                    type="date"
+                    value={form.reservation_date}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, reservation_date: e.target.value }))
+                    }
+                    style={{
+                      minHeight: 44,
+                      borderRadius: 8,
+                      border: `1px solid ${UI.border}`,
+                      padding: '10px 12px',
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gap: 6 }}>
+                  <label style={{ fontSize: 13, fontWeight: 700 }}>Ora</label>
+                  <input
+                    type="time"
+                    value={form.reservation_hour}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, reservation_hour: e.target.value }))
+                    }
+                    style={{
+                      minHeight: 44,
+                      borderRadius: 8,
+                      border: `1px solid ${UI.border}`,
+                      padding: '10px 12px',
+                    }}
+                  />
+                </div>
               </div>
 
-              <div>
-                <label style={labelStyle}>Telefono</label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="Es. 3331234567"
-                  style={inputStyle}
-                />
-              </div>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+                  gap: 12,
+                }}
+              >
+                <div style={{ display: 'grid', gap: 6 }}>
+                  <label style={{ fontSize: 13, fontWeight: 700 }}>Coperti</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={form.guests}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, guests: Number(e.target.value) || 1 }))
+                    }
+                    style={{
+                      minHeight: 44,
+                      borderRadius: 8,
+                      border: `1px solid ${UI.border}`,
+                      padding: '10px 12px',
+                    }}
+                  />
+                </div>
 
-              <div>
-                <label style={labelStyle}>Tavolo</label>
-                <select
-                  value={selectedTableId}
-                  onChange={(e) => setSelectedTableId(e.target.value)}
-                  style={inputStyle}
-                >
-                  <option value="">Seleziona tavolo</option>
-                  {tables.map((table) => {
-                    const isBusy = busyTableIds.includes(table.id);
-
-                    return (
-                      <option key={table.id} value={table.id} disabled={isBusy}>
+                <div style={{ display: 'grid', gap: 6 }}>
+                  <label style={{ fontSize: 13, fontWeight: 700 }}>Tavolo</label>
+                  <select
+                    value={form.table_id}
+                    onChange={(e) => setForm((prev) => ({ ...prev, table_id: e.target.value }))}
+                    style={{
+                      minHeight: 44,
+                      borderRadius: 8,
+                      border: `1px solid ${UI.border}`,
+                      padding: '10px 12px',
+                      background: '#fff',
+                    }}
+                  >
+                    <option value="">Non assegnato</option>
+                    {tables.map((table) => (
+                      <option key={table.id} value={table.id}>
                         {table.name}
-                        {isBusy ? ' — già prenotato in questo giorno' : ''}
                       </option>
-                    );
-                  })}
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gap: 6 }}>
+                <label style={{ fontSize: 13, fontWeight: 700 }}>Stato</label>
+                <select
+                  value={form.status}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      status: e.target.value as ReservationStatus,
+                    }))
+                  }
+                  style={{
+                    minHeight: 44,
+                    borderRadius: 8,
+                    border: `1px solid ${UI.border}`,
+                    padding: '10px 12px',
+                    background: '#fff',
+                  }}
+                >
+                  <option value="confirmed">Confermata</option>
+                  <option value="cancelled">Cancellata</option>
                 </select>
               </div>
 
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label style={labelStyle}>Note</label>
+              <div style={{ display: 'grid', gap: 6 }}>
+                <label style={{ fontSize: 13, fontWeight: 700 }}>Note</label>
                 <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Es. tavolo esterno, compleanno, passeggino..."
-                  style={textareaStyle}
+                  value={form.notes}
+                  onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
+                  rows={4}
+                  placeholder="Note cliente, intolleranze, richieste tavolo..."
+                  style={{
+                    borderRadius: 8,
+                    border: `1px solid ${UI.border}`,
+                    padding: '10px 12px',
+                    resize: 'vertical',
+                  }}
                 />
               </div>
-            </div>
 
-            <div
-              style={{
-                marginTop: 16,
-                paddingTop: 12,
-                borderTop: `1px solid ${UI.borderSoft}`,
-                display: 'flex',
-                justifyContent: 'space-between',
-                gap: 8,
-                flexWrap: 'wrap',
-              }}
-            >
-              <div>
-                {editingReservationId && (
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 8,
+                  flexWrap: 'wrap',
+                  marginTop: 4,
+                }}
+              >
+                <div style={{ fontSize: 12, color: UI.textSoft }}>
+                  Giorno selezionato: {formatHumanDate(form.reservation_date)}
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <button
                     type="button"
-                    onClick={handleDeleteReservation}
-                    disabled={saving}
+                    onClick={() => setModalOpen(false)}
                     style={{
-                      padding: '9px 12px',
-                      borderRadius: 6,
-                      border: 'none',
-                      backgroundColor: UI.danger,
-                      color: UI.dangerText,
-                      fontSize: 13,
+                      minHeight: 42,
+                      padding: '10px 14px',
+                      borderRadius: 8,
+                      border: `1px solid ${UI.border}`,
+                      background: '#fff',
+                      color: UI.text,
                       fontWeight: 700,
-                      cursor: saving ? 'not-allowed' : 'pointer',
+                      cursor: 'pointer',
                     }}
                   >
-                    Annulla prenotazione
+                    Chiudi
                   </button>
-                )}
-              </div>
 
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowModal(false);
-                    resetForm();
-                  }}
-                  style={{
-                    padding: '9px 12px',
-                    borderRadius: 6,
-                    border: `1px solid ${UI.border}`,
-                    backgroundColor: UI.surface,
-                    color: UI.text,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Chiudi
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleSaveReservation}
-                  disabled={saving}
-                  style={{
-                    padding: '9px 12px',
-                    borderRadius: 6,
-                    border: 'none',
-                    backgroundColor: UI.primary,
-                    color: UI.primaryText,
-                    fontSize: 13,
-                    fontWeight: 700,
-                    cursor: saving ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  {saving
-                    ? 'Salvataggio…'
-                    : editingReservationId
-                    ? 'Salva modifiche'
-                    : 'Crea prenotazione'}
-                </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    style={{
+                      minHeight: 42,
+                      padding: '10px 14px',
+                      borderRadius: 8,
+                      border: '1px solid #111',
+                      background: '#111',
+                      color: '#fff',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {saving ? 'Salvataggio...' : editingReservationId ? 'Salva modifiche' : 'Crea prenotazione'}
+                  </button>
+                </div>
               </div>
-            </div>
+            </form>
           </div>
         </div>
       )}
-    </main>
+    </div>
   );
 }
