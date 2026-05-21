@@ -6,7 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL as string,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
+  process.env.NEXTPUBLIC_SUPABASE_ANON_KEY as string
 );
 
 type TableStatus = 'libero' | 'occupato' | 'prenotato';
@@ -83,6 +83,9 @@ export default function StaffPage() {
   const [statusMenuTableId, setStatusMenuTableId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [showMap, setShowMap] = useState(true);
+
+  // NUOVO: modalità layout esplicita
+  const [isLayoutMode, setIsLayoutMode] = useState(false);
 
   const dragStateRef = useRef<{
     tableId: string | null;
@@ -508,6 +511,14 @@ export default function StaffPage() {
     e: React.PointerEvent<HTMLButtonElement>,
     table: DerivedTableRow
   ) {
+    if (!isLayoutMode) {
+      // in modalità normale, niente drag: apri ordine
+      e.preventDefault();
+      e.stopPropagation();
+      router.push(`/staff/table/${table.id}`);
+      return;
+    }
+
     e.preventDefault();
     e.stopPropagation();
 
@@ -530,6 +541,8 @@ export default function StaffPage() {
     e: React.PointerEvent<HTMLButtonElement>,
     table: DerivedTableRow
   ) {
+    if (!isLayoutMode) return;
+
     const drag = dragStateRef.current;
     if (drag.tableId !== table.id || drag.pointerId !== e.pointerId) return;
 
@@ -564,6 +577,8 @@ export default function StaffPage() {
     e: React.PointerEvent<HTMLButtonElement>,
     table: DerivedTableRow
   ) {
+    if (!isLayoutMode) return;
+
     const drag = dragStateRef.current;
     if (drag.tableId !== table.id || drag.pointerId !== e.pointerId) return;
 
@@ -576,8 +591,6 @@ export default function StaffPage() {
 
     if (drag.moved) {
       await persistTablePosition(table.id, drag.liveX, drag.liveY);
-    } else {
-      router.push(`/staff/table/${table.id}`);
     }
 
     dragStateRef.current = {
@@ -597,6 +610,8 @@ export default function StaffPage() {
     e: React.PointerEvent<HTMLButtonElement>,
     table: DerivedTableRow
   ) {
+    if (!isLayoutMode) return;
+
     const drag = dragStateRef.current;
     if (drag.tableId !== table.id || drag.pointerId !== e.pointerId) return;
 
@@ -665,7 +680,9 @@ export default function StaffPage() {
                 Gestione tavoli
               </h1>
               <p style={{ margin: '4px 0 0 0', fontSize: 12, color: '#666' }}>
-                Tocca un tavolo per aprire l’ordine, trascinalo per spostarlo.
+                {isLayoutMode
+                  ? 'Modalità layout: trascina i tavoli per cambiare posizione.'
+                  : 'Tocca un tavolo per aprire l’ordine.'}
               </p>
             </div>
 
@@ -700,6 +717,22 @@ export default function StaffPage() {
                 }}
               >
                 {showMap ? 'Nascondi mappa' : 'Mostra mappa'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsLayoutMode((prev) => !prev)}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  border: isLayoutMode ? '1px solid #111' : '1px solid #ccc',
+                  background: isLayoutMode ? '#111' : '#fff',
+                  color: isLayoutMode ? '#fff' : '#111',
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                }}
+              >
+                {isLayoutMode ? 'Fine modifica layout' : 'Modifica layout'}
               </button>
 
               <button
@@ -862,7 +895,7 @@ export default function StaffPage() {
                             border: `2px solid ${colors.border}`,
                             background: colors.bg,
                             color: colors.text,
-                            cursor: 'grab',
+                            cursor: isLayoutMode ? 'grab' : 'pointer',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -870,7 +903,9 @@ export default function StaffPage() {
                             touchAction: 'none',
                             padding: 2,
                             zIndex: 3,
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.10)',
+                            boxShadow: isLayoutMode
+                              ? '0 0 0 2px rgba(59,130,246,0.4)'
+                              : '0 2px 6px rgba(0,0,0,0.10)',
                             overflow: 'hidden',
                           }}
                           title={`${table.name} - ${table.derivedStatus}`}
@@ -965,7 +1000,7 @@ export default function StaffPage() {
                           border: `2px solid ${colors.border}`,
                           background: colors.bg,
                           color: colors.text,
-                          cursor: 'grab',
+                          cursor: isLayoutMode ? 'grab' : 'pointer',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -973,7 +1008,9 @@ export default function StaffPage() {
                           touchAction: 'none',
                           padding: 2,
                           zIndex: 3,
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.10)',
+                          boxShadow: isLayoutMode
+                            ? '0 0 0 2px rgba(59,130,246,0.4)'
+                            : '0 2px 6px rgba(0,0,0,0.10)',
                           overflow: 'hidden',
                         }}
                         title={`${table.name} - ${table.derivedStatus}`}
