@@ -2,12 +2,20 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL as string,
-  process.env.NEXTPUBLIC_SUPABASE_ANON_KEY as string
-);
+function getSupabaseBrowserClient(): SupabaseClient {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !key) {
+    throw new Error(
+      'Variabili Supabase mancanti: configura NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY su Vercel.'
+    );
+  }
+
+  return createClient(url, key);
+}
 
 type TableStatus = 'libero' | 'occupato' | 'prenotato';
 
@@ -72,6 +80,7 @@ function isReservationActive(status: string | null | undefined) {
 
 export default function StaffPage() {
   const router = useRouter();
+  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
 
   const [baseTables, setBaseTables] = useState<TableRow[]>([]);
   const [layoutOverrides, setLayoutOverrides] = useState<TableLayoutOverrideRow[]>([]);
@@ -83,8 +92,6 @@ export default function StaffPage() {
   const [statusMenuTableId, setStatusMenuTableId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [showMap, setShowMap] = useState(true);
-
-  // NUOVO: modalità layout esplicita
   const [isLayoutMode, setIsLayoutMode] = useState(false);
 
   const dragStateRef = useRef<{
@@ -144,7 +151,7 @@ export default function StaffPage() {
     }
 
     loadOverridesForDate();
-  }, [selectedDate]);
+  }, [selectedDate, supabase]);
 
   useEffect(() => {
     async function loadReservationsForDate() {
@@ -178,7 +185,7 @@ export default function StaffPage() {
     }
 
     loadReservationsForDate();
-  }, [selectedDate]);
+  }, [selectedDate, supabase]);
 
   useEffect(() => {
     const closeMenus = () => setStatusMenuTableId(null);
@@ -259,7 +266,7 @@ export default function StaffPage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [selectedDate]);
+  }, [selectedDate, supabase]);
 
   async function loadInitialData() {
     setLoading(true);
@@ -512,7 +519,6 @@ export default function StaffPage() {
     table: DerivedTableRow
   ) {
     if (!isLayoutMode) {
-      // in modalità normale, niente drag: apri ordine
       e.preventDefault();
       e.stopPropagation();
       router.push(`/staff/table/${table.id}`);
