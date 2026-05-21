@@ -321,6 +321,31 @@ export default function CalendarPage() {
     return activeReservationsOfSelectedDate.reduce((sum, r) => sum + Number(r.people_count || 0), 0);
   }, [activeReservationsOfSelectedDate]);
 
+  const reservedTableIdsForFormDate = useMemo(() => {
+    const selectedFormDate = form.reservation_date;
+
+    return new Set(
+      reservations
+        .filter((reservation) => {
+          if (!isReservationActive(reservation.status)) return false;
+          if (!reservation.table_id) return false;
+          if (getDatePart(reservation.reservation_time) !== selectedFormDate) return false;
+
+          if (editingReservationId && reservation.id === editingReservationId) {
+            return false;
+          }
+
+          return true;
+        })
+        .map((reservation) => reservation.table_id as string)
+    );
+  }, [reservations, form.reservation_date, editingReservationId]);
+
+  function isTableDisabled(tableId: string) {
+    if (!tableId) return false;
+    return reservedTableIdsForFormDate.has(tableId);
+  }
+
   function resetForm(date?: string) {
     setEditingReservationId(null);
     setForm({
@@ -343,6 +368,7 @@ export default function CalendarPage() {
 
   function openEditReservation(reservation: ReservationRow) {
     setEditingReservationId(reservation.id);
+
     setForm({
       customer_name: reservation.customer_name ?? '',
       phone: reservation.phone ?? '',
@@ -352,6 +378,7 @@ export default function CalendarPage() {
       table_id: reservation.table_id ?? '',
       notes: reservation.notes ?? '',
     });
+
     setModalOpen(true);
   }
 
@@ -1151,6 +1178,38 @@ export default function CalendarPage() {
                       : 'Nessun tavolo selezionato'}
                   </div>
 
+                  <select
+                    value={form.table_id}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        table_id: e.target.value,
+                      }))
+                    }
+                    style={{
+                      minHeight: 44,
+                      borderRadius: 8,
+                      border: `1px solid ${UI.border}`,
+                      padding: '10px 12px',
+                      background: '#fff',
+                      color: UI.text,
+                      fontWeight: 600,
+                    }}
+                  >
+                    <option value="">Nessun tavolo</option>
+
+                    {tables.map((table) => {
+                      const disabled = isTableDisabled(table.id);
+
+                      return (
+                        <option key={table.id} value={table.id} disabled={disabled}>
+                          {table.name}
+                          {disabled ? ' — questo tavolo è già prenotato' : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+
                   <div
                     style={{
                       display: 'flex',
@@ -1158,41 +1217,30 @@ export default function CalendarPage() {
                       gap: 8,
                     }}
                   >
-                    <button
-                      type="button"
-                      onClick={() => setForm((prev) => ({ ...prev, table_id: '' }))}
-                      style={{
-                        padding: '8px 10px',
-                        borderRadius: 999,
-                        border: form.table_id === '' ? '1px solid #111' : `1px solid ${UI.border}`,
-                        background: form.table_id === '' ? '#111' : '#fff',
-                        color: form.table_id === '' ? '#fff' : UI.text,
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Nessun tavolo
-                    </button>
-
                     {tables.map((table) => {
                       const active = form.table_id === table.id;
+                      const disabled = isTableDisabled(table.id);
 
                       return (
                         <button
                           key={table.id}
                           type="button"
+                          disabled={disabled}
                           onClick={() => setForm((prev) => ({ ...prev, table_id: table.id }))}
                           style={{
                             padding: '8px 10px',
                             borderRadius: 999,
                             border: active ? '1px solid #111' : `1px solid ${UI.border}`,
-                            background: active ? '#111' : '#fff',
-                            color: active ? '#fff' : UI.text,
+                            background: active ? '#111' : disabled ? '#f5f5f5' : '#fff',
+                            color: active ? '#fff' : disabled ? '#999' : UI.text,
                             fontWeight: 700,
-                            cursor: 'pointer',
+                            cursor: disabled ? 'not-allowed' : 'pointer',
+                            opacity: disabled ? 0.65 : 1,
                           }}
+                          title={disabled ? 'Questo tavolo è già prenotato' : `Seleziona ${table.name}`}
                         >
                           {table.name}
+                          {disabled ? ' · prenotato' : ''}
                         </button>
                       );
                     })}
