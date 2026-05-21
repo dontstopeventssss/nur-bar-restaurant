@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin, { DateClickArg } from '@fullcalendar/interaction';
 import listPlugin from '@fullcalendar/list';
@@ -64,7 +64,6 @@ type ReservationForm = {
   guests: number;
   table_id: string;
   notes: string;
-  status: ReservationStatus;
 };
 
 const UI = {
@@ -77,7 +76,6 @@ const UI = {
   primary: '#111111',
   success: '#1f7a1f',
   danger: '#b42318',
-  warning: '#a15c00',
 };
 
 function addDays(date: Date, days: number) {
@@ -92,10 +90,6 @@ function pad2(value: number) {
 
 function toDateInputValue(date: Date) {
   return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
-}
-
-function toTimeInputValue(date: Date) {
-  return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
 }
 
 function toLocalDateTimeString(date: Date) {
@@ -123,9 +117,9 @@ function endOfMonth(date: Date) {
 }
 
 function formatHumanDate(value: string) {
-  const d = new Date(value);
+  const d = new Date(`${value}T12:00:00`);
   return d.toLocaleDateString('it-IT', {
-    weekday: 'short',
+    weekday: 'long',
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -144,6 +138,8 @@ function formatHumanDateTime(value: string) {
 }
 
 export default function CalendarPage() {
+  const router = useRouter();
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -154,8 +150,8 @@ export default function CalendarPage() {
   const [venueCapacity, setVenueCapacity] = useState<number>(0);
 
   const [selectedDate, setSelectedDate] = useState<string>(toDateInputValue(new Date()));
-  const [currentView, setCurrentView] = useState<'dayGridMonth' | 'timeGridDay' | 'listWeek'>(
-    typeof window !== 'undefined' && window.innerWidth < 768 ? 'listWeek' : 'dayGridMonth'
+  const [currentView, setCurrentView] = useState<'timeGridDay' | 'listWeek'>(
+    typeof window !== 'undefined' && window.innerWidth < 768 ? 'listWeek' : 'timeGridDay'
   );
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -169,21 +165,24 @@ export default function CalendarPage() {
     guests: 2,
     table_id: '',
     notes: '',
-    status: 'confirmed',
   });
 
   const [loadedRange, setLoadedRange] = useState<{ start: string; end: string } | null>(null);
 
   useEffect(() => {
     const onResize = () => {
-      const mobile = window.innerWidth < 768;
-      setIsMobile(mobile);
+      setIsMobile(window.innerWidth < 768);
     };
 
     onResize();
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  useEffect(() => {
+    router.prefetch('/staff');
+    router.prefetch('/owner');
+  }, [router]);
 
   const loadStaticData = useCallback(async () => {
     const [{ data: tablesData, error: tablesError }, { data: settingsData, error: settingsError }] =
@@ -266,6 +265,12 @@ export default function CalendarPage() {
       .sort((a, b) => a.reservation_time.localeCompare(b.reservation_time));
   }, [reservations, selectedDate]);
 
+  const totalGuestsOfSelectedDay = useMemo(() => {
+    return reservationsOfSelectedDate
+      .filter((r) => r.status !== 'cancelled')
+      .reduce((sum, r) => sum + Number(r.guests || 0), 0);
+  }, [reservationsOfSelectedDate]);
+
   function resetForm(date?: string) {
     setEditingReservationId(null);
     setForm({
@@ -276,7 +281,6 @@ export default function CalendarPage() {
       guests: 2,
       table_id: '',
       notes: '',
-      status: 'confirmed',
     });
   }
 
@@ -297,7 +301,6 @@ export default function CalendarPage() {
       guests: reservation.guests ?? 2,
       table_id: reservation.table_id ?? '',
       notes: reservation.notes ?? '',
-      status: reservation.status ?? 'confirmed',
     });
     setModalOpen(true);
   }
@@ -324,17 +327,11 @@ export default function CalendarPage() {
       guests: Number(form.guests),
       table_id: form.table_id || null,
       notes: form.notes.trim() || null,
-      status: form.status,
+      status: 'confirmed' as ReservationStatus,
     };
 
     if (!payload.customer_name) {
       alert('Inserisci il nome cliente');
-      setSaving(false);
-      return;
-    }
-
-    if (!payload.reservation_time) {
-      alert('Inserisci data e orario');
       setSaving(false);
       return;
     }
@@ -372,7 +369,7 @@ export default function CalendarPage() {
   }
 
   async function handleDeleteReservation(id: string) {
-    const confirmDelete = window.confirm('Vuoi davvero cancellare questa prenotazione?');
+    const confirmDelete = window.confirm('Vuoi davvero eliminare questa prenotazione?');
     if (!confirmDelete) return;
 
     setDeleting(true);
@@ -387,6 +384,7 @@ export default function CalendarPage() {
     }
 
     setReservations((prev) => prev.filter((r) => r.id !== id));
+
     if (editingReservationId === id) {
       setModalOpen(false);
     }
@@ -410,12 +408,6 @@ export default function CalendarPage() {
       prev.map((r) => (r.id === id ? { ...r, status: 'cancelled' } : r))
     );
   }
-
-  const totalGuestsOfSelectedDay = useMemo(() => {
-    return reservationsOfSelectedDate
-      .filter((r) => r.status !== 'cancelled')
-      .reduce((sum, r) => sum + Number(r.guests || 0), 0);
-  }, [reservationsOfSelectedDate]);
 
   return (
     <div
@@ -448,11 +440,45 @@ export default function CalendarPage() {
               Calendar
             </h1>
             <p style={{ color: UI.textSoft, fontSize: 14 }}>
-              Prenotazioni sala con vista mese, giorno e lista.
+              Prenotazioni sala con vista giorno e settimana.
             </p>
           </div>
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => router.push('/staff')}
+              style={{
+                padding: '10px 14px',
+                minHeight: 42,
+                borderRadius: 10,
+                border: `1px solid ${UI.border}`,
+                background: '#fff',
+                color: UI.text,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Staff
+            </button>
+
+            <button
+              type="button"
+              onClick={() => router.push('/owner')}
+              style={{
+                padding: '10px 14px',
+                minHeight: 42,
+                borderRadius: 10,
+                border: `1px solid ${UI.border}`,
+                background: '#fff',
+                color: UI.text,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Owner
+            </button>
+
             <button
               type="button"
               onClick={() => openNewReservation(new Date())}
@@ -475,7 +501,7 @@ export default function CalendarPage() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1.5fr) minmax(320px, 420px)',
+            gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1.45fr) minmax(320px, 420px)',
             gap: 16,
             alignItems: 'start',
           }}
@@ -526,7 +552,8 @@ export default function CalendarPage() {
               }
 
               .nur-calendar .fc .fc-col-header-cell-cushion,
-              .nur-calendar .fc .fc-daygrid-day-number,
+              .nur-calendar .fc .fc-timegrid-axis-cushion,
+              .nur-calendar .fc .fc-timegrid-slot-label-cushion,
               .nur-calendar .fc .fc-list-day-text,
               .nur-calendar .fc .fc-list-day-side-text {
                 color: ${UI.text};
@@ -534,18 +561,13 @@ export default function CalendarPage() {
                 font-weight: 700;
               }
 
-              .nur-calendar .fc .fc-daygrid-day.fc-day-today,
-              .nur-calendar .fc .fc-timegrid-col.fc-day-today {
-                background: #f6efe8;
+              .nur-calendar .fc .fc-day-today {
+                background: #f6efe8 !important;
               }
 
               .nur-calendar .fc .fc-event {
                 border-radius: 8px;
                 padding: 2px 4px;
-              }
-
-              .nur-calendar .fc .fc-daygrid-event-dot {
-                border-color: #111;
               }
 
               @media (max-width: 767px) {
@@ -586,50 +608,30 @@ export default function CalendarPage() {
                 <div style={{ padding: 16, color: UI.text }}>Caricamento calendario…</div>
               ) : (
                 <FullCalendar
-                  plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
-                  initialView={isMobile ? 'listWeek' : 'dayGridMonth'}
+                  plugins={[timeGridPlugin, interactionPlugin, listPlugin]}
+                  initialView={isMobile ? 'listWeek' : 'timeGridDay'}
                   locale="it"
-                  customButtons={{
-                    newReservation: {
-                      text: 'Nuova',
-                      click: () => openNewReservation(new Date()),
-                    },
+                  headerToolbar={{
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'timeGridDay,listWeek',
                   }}
-                  headerToolbar={
-                    isMobile
-                      ? {
-                          left: 'prev,next today',
-                          center: 'title',
-                          right: 'newReservation,timeGridDay,listWeek',
-                        }
-                      : {
-                          left: 'prev,next today',
-                          center: 'title',
-                          right: 'newReservation,dayGridMonth,timeGridDay,listWeek',
-                        }
-                  }
                   buttonText={{
                     today: 'Oggi',
-                    month: 'Mese',
                     day: 'Giorno',
-                    listWeek: 'Lista',
+                    listWeek: 'Settimana',
                   }}
                   initialDate={selectedDate}
                   height="auto"
                   editable={false}
                   selectable
-                  dayMaxEventRows={isMobile ? 2 : 4}
                   datesSet={async (info) => {
-                    setCurrentView(info.view.type as 'dayGridMonth' | 'timeGridDay' | 'listWeek');
+                    setCurrentView(info.view.type as 'timeGridDay' | 'listWeek');
 
                     const start = info.startStr.slice(0, 19);
                     const end = info.endStr.slice(0, 19);
 
-                    if (
-                      !loadedRange ||
-                      start < loadedRange.start ||
-                      end > loadedRange.end
-                    ) {
+                    if (!loadedRange || start < loadedRange.start || end > loadedRange.end) {
                       await loadReservationsRange(start, end);
                     }
 
@@ -663,7 +665,6 @@ export default function CalendarPage() {
             style={{
               display: 'grid',
               gap: 12,
-              position: 'relative',
             }}
           >
             <div
@@ -678,38 +679,33 @@ export default function CalendarPage() {
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: 8,
-                  marginBottom: 8,
+                  alignItems: 'flex-start',
+                  gap: 12,
                   flexWrap: 'wrap',
                 }}
               >
-                <h2 style={{ fontSize: 18, fontWeight: 800 }}>Giorno</h2>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                  }}
-                >
-                  <span style={{ fontSize: 13, fontWeight: 700, color: UI.textSoft }}>
-                    Data
-                  </span>
-                  <input
-                    type="date"
-                    value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    style={{
-                      padding: '8px 10px',
-                      borderRadius: 8,
-                      border: `1px solid ${UI.border}`,
-                      background: '#fff',
-                      color: UI.text,
-                      minHeight: 40,
-                    }}
-                  />
+                <div>
+                  <h2 style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>
+                    Giorno selezionato
+                  </h2>
+                  <div style={{ color: UI.textSoft, fontSize: 13, fontWeight: 600 }}>
+                    {formatHumanDate(selectedDate)}
+                  </div>
                 </div>
+
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    border: `1px solid ${UI.border}`,
+                    background: '#fff',
+                    color: UI.text,
+                    minHeight: 40,
+                  }}
+                />
               </div>
 
               <div
@@ -717,6 +713,7 @@ export default function CalendarPage() {
                   display: 'grid',
                   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
                   gap: 8,
+                  marginTop: 12,
                 }}
               >
                 <div
@@ -770,30 +767,20 @@ export default function CalendarPage() {
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
-                  alignItems: 'center',
+                  alignItems: 'flex-start',
                   gap: 8,
                   marginBottom: 12,
+                  flexWrap: 'wrap',
                 }}
               >
-                <h2 style={{ fontSize: 18, fontWeight: 800 }}>
-                  Lista prenotazioni
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => openNewReservation(new Date(`${selectedDate}T12:00:00`))}
-                  style={{
-                    padding: '8px 10px',
-                    minHeight: 40,
-                    borderRadius: 8,
-                    border: `1px solid ${UI.border}`,
-                    background: '#fff',
-                    color: UI.text,
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Aggiungi
-                </button>
+                <div>
+                  <h2 style={{ fontSize: 18, fontWeight: 800 }}>
+                    Lista prenotazioni
+                  </h2>
+                  <div style={{ fontSize: 13, color: UI.textSoft, fontWeight: 600, marginTop: 4 }}>
+                    Giorno selezionato: {formatHumanDate(selectedDate)}
+                  </div>
+                </div>
               </div>
 
               {reservationsOfSelectedDate.length === 0 ? (
@@ -968,8 +955,8 @@ export default function CalendarPage() {
                 </h3>
                 <div style={{ color: UI.textSoft, fontSize: 13 }}>
                   {editingReservationId
-                    ? 'Aggiorna i dati della prenotazione'
-                    : 'Inserisci una nuova prenotazione'}
+                    ? 'Modifica i dati della prenotazione'
+                    : 'Prenotazione inserita come confermata'}
                 </div>
               </div>
 
@@ -1112,35 +1099,12 @@ export default function CalendarPage() {
               </div>
 
               <div style={{ display: 'grid', gap: 6 }}>
-                <label style={{ fontSize: 13, fontWeight: 700 }}>Stato</label>
-                <select
-                  value={form.status}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      status: e.target.value as ReservationStatus,
-                    }))
-                  }
-                  style={{
-                    minHeight: 44,
-                    borderRadius: 8,
-                    border: `1px solid ${UI.border}`,
-                    padding: '10px 12px',
-                    background: '#fff',
-                  }}
-                >
-                  <option value="confirmed">Confermata</option>
-                  <option value="cancelled">Cancellata</option>
-                </select>
-              </div>
-
-              <div style={{ display: 'grid', gap: 6 }}>
                 <label style={{ fontSize: 13, fontWeight: 700 }}>Note</label>
                 <textarea
                   value={form.notes}
                   onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
                   rows={4}
-                  placeholder="Note cliente, intolleranze, richieste tavolo..."
+                  placeholder="Note cliente, richieste tavolo, orario..."
                   style={{
                     borderRadius: 8,
                     border: `1px solid ${UI.border}`,
