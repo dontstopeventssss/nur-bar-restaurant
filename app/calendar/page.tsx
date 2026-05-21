@@ -1134,123 +1134,87 @@ export default function CalendarPage() {
                 </div>
               </div>
 
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: isMobile ? '1fr' : '1fr',
-                  gap: 12,
-                }}
-              >
-                <div style={{ display: 'grid', gap: 6 }}>
-                  <label style={{ fontSize: 13, fontWeight: 700 }}>Coperti</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={form.people_count}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, people_count: Number(e.target.value) || 1 }))
-                    }
-                    style={{
-                      minHeight: 44,
-                      borderRadius: 8,
-                      border: `1px solid ${UI.border}`,
-                      padding: '10px 12px',
-                    }}
-                  />
-                </div>
+             <div
+  style={{
+    display: 'grid',
+    gridTemplateColumns: isMobile ? '1fr' : '1fr',
+    gap: 12,
+  }}
+>
+  <div style={{ display: 'grid', gap: 6 }}>
+    <label style={{ fontSize: 13, fontWeight: 700 }}>Coperti</label>
+    <input
+      type="number"
+      min={1}
+      value={form.people_count}
+      onChange={(e) =>
+        setForm((prev) => ({ ...prev, people_count: Number(e.target.value) || 1 }))
+      }
+      style={{
+        minHeight: 44,
+        borderRadius: 8,
+        border: `1px solid ${UI.border}`,
+        padding: '10px 12px',
+      }}
+    />
+  </div>
 
-                <div style={{ display: 'grid', gap: 8 }}>
-                  <label style={{ fontSize: 13, fontWeight: 700 }}>Tavolo</label>
+  <div style={{ display: 'grid', gap: 8 }}>
+    <label style={{ fontSize: 13, fontWeight: 700 }}>Tavolo</label>
 
-                  <div
-                    style={{
-                      padding: '10px 12px',
-                      borderRadius: 8,
-                      border: `1px solid ${UI.border}`,
-                      background: '#fff',
-                      color: form.table_id ? UI.text : UI.textSoft,
-                      fontSize: 14,
-                      fontWeight: 700,
-                    }}
-                  >
-                    {form.table_id
-                      ? `Tavolo selezionato: ${tables.find((t) => t.id === form.table_id)?.name ?? '—'}`
-                      : 'Nessun tavolo selezionato'}
-                  </div>
+    <select
+      value={form.table_id}
+      onChange={(e) =>
+        setForm((prev) => ({
+          ...prev,
+          table_id: e.target.value,
+        }))
+      }
+      style={{
+        minHeight: 44,
+        borderRadius: 8,
+        border: `1px solid ${UI.border}`,
+        padding: '10px 12px',
+        background: '#fff',
+        color: UI.text,
+        fontWeight: 600,
+      }}
+    >
+      <option value="">Nessun tavolo</option>
 
-                  <select
-                    value={form.table_id}
-                    onChange={(e) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        table_id: e.target.value,
-                      }))
-                    }
-                    style={{
-                      minHeight: 44,
-                      borderRadius: 8,
-                      border: `1px solid ${UI.border}`,
-                      padding: '10px 12px',
-                      background: '#fff',
-                      color: UI.text,
-                      fontWeight: 600,
-                    }}
-                  >
-                    <option value="">Nessun tavolo</option>
+      {tables.map((table) => {
+        const disabled = isTableDisabled(table.id);
 
-                    {tables.map((table) => {
-                      const disabled = isTableDisabled(table.id);
+        return (
+          <option key={table.id} value={table.id} disabled={disabled}>
+            {table.name}
+            {disabled ? ' — questo tavolo è già prenotato' : ''}
+          </option>
+        );
+      })}
+    </select>
 
-                      return (
-                        <option key={table.id} value={table.id} disabled={disabled}>
-                          {table.name}
-                          {disabled ? ' — questo tavolo è già prenotato' : ''}
-                        </option>
-                      );
-                    })}
-                  </select>
-
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      gap: 8,
-                    }}
-                  >
-                    {tables.map((table) => {
-                      const active = form.table_id === table.id;
-                      const disabled = isTableDisabled(table.id);
-
-                      return (
-                        <button
-                          key={table.id}
-                          type="button"
-                          disabled={disabled}
-                          onClick={() => setForm((prev) => ({ ...prev, table_id: table.id }))}
-                          style={{
-                            padding: '8px 10px',
-                            borderRadius: 999,
-                            border: active ? '1px solid #111' : `1px solid ${UI.border}`,
-                            background: active ? '#111' : disabled ? '#f5f5f5' : '#fff',
-                            color: active ? '#fff' : disabled ? '#999' : UI.text,
-                            fontWeight: 700,
-                            cursor: disabled ? 'not-allowed' : 'pointer',
-                            opacity: disabled ? 0.65 : 1,
-                          }}
-                          title={disabled ? 'Questo tavolo è già prenotato' : `Seleziona ${table.name}`}
-                        >
-                          {table.name}
-                          {disabled ? ' · prenotato' : ''}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <div style={{ fontSize: 12, color: UI.textSoft }}>
-                    Tavoli caricati: {tables.length}
-                  </div>
-                </div>
-              </div>
+    {form.table_id ? (
+      <div
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          width: 'fit-content',
+          minHeight: 36,
+          padding: '8px 12px',
+          borderRadius: 999,
+          border: `1px solid ${UI.border}`,
+          background: UI.surfaceAlt,
+          color: UI.text,
+          fontSize: 14,
+          fontWeight: 700,
+        }}
+      >
+        Tavolo: {tables.find((t) => t.id === form.table_id)?.name ?? '—'}
+      </div>
+    ) : null}
+  </div>
+</div>
 
               <div style={{ display: 'grid', gap: 6 }}>
                 <label style={{ fontSize: 13, fontWeight: 700 }}>Note</label>
