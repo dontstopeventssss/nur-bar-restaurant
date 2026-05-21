@@ -74,7 +74,6 @@ const UI = {
   text: '#161616',
   textSoft: '#6f6a64',
   primary: '#111111',
-  success: '#1f7a1f',
   danger: '#b42318',
 };
 
@@ -194,6 +193,7 @@ export default function CalendarPage() {
     if (tablesError) {
       console.error('Errore caricamento tavoli', tablesError);
     } else {
+      console.log('TAVOLI CARICATI CALENDAR:', tablesData);
       setTables((tablesData as TableRow[]) ?? []);
     }
 
@@ -237,6 +237,16 @@ export default function CalendarPage() {
 
     run();
   }, [loadReservationsRange, loadStaticData]);
+
+  useEffect(() => {
+    if (tables.length === 0) return;
+
+    const exists = tables.some((table) => table.id === form.table_id);
+
+    if (!exists && form.table_id !== '') {
+      setForm((prev) => ({ ...prev, table_id: '' }));
+    }
+  }, [tables, form.table_id]);
 
   const calendarEvents = useMemo(() => {
     return reservations.map((reservation) => {
@@ -1075,26 +1085,68 @@ export default function CalendarPage() {
                   />
                 </div>
 
-                <div style={{ display: 'grid', gap: 6 }}>
+                <div style={{ display: 'grid', gap: 8 }}>
                   <label style={{ fontSize: 13, fontWeight: 700 }}>Tavolo</label>
+
                   <select
-                    value={form.table_id}
+                    key={`table-select-${tables.length}`}
+                    value={form.table_id || ''}
                     onChange={(e) => setForm((prev) => ({ ...prev, table_id: e.target.value }))}
+                    disabled={tables.length === 0}
                     style={{
                       minHeight: 44,
                       borderRadius: 8,
                       border: `1px solid ${UI.border}`,
                       padding: '10px 12px',
-                      background: '#fff',
+                      background: tables.length === 0 ? '#f8f8f8' : '#fff',
+                      color: UI.text,
                     }}
                   >
-                    <option value="">Non assegnato</option>
+                    <option value="">
+                      {tables.length === 0 ? 'Nessun tavolo disponibile' : 'Seleziona tavolo'}
+                    </option>
+
                     {tables.map((table) => (
                       <option key={table.id} value={table.id}>
-                        {table.name}
+                        {table.name}{table.seats ? ` • ${table.seats} posti` : ''}
                       </option>
                     ))}
                   </select>
+
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 6,
+                    }}
+                  >
+                    {tables.map((table) => {
+                      const active = form.table_id === table.id;
+
+                      return (
+                        <button
+                          key={table.id}
+                          type="button"
+                          onClick={() => setForm((prev) => ({ ...prev, table_id: table.id }))}
+                          style={{
+                            padding: '8px 10px',
+                            borderRadius: 999,
+                            border: active ? '1px solid #111' : `1px solid ${UI.border}`,
+                            background: active ? '#111' : '#fff',
+                            color: active ? '#fff' : UI.text,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {table.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div style={{ fontSize: 12, color: UI.textSoft }}>
+                    Tavoli caricati: {tables.length}
+                  </div>
                 </div>
               </div>
 
