@@ -29,8 +29,8 @@ type MenuItem = {
 
 type OrderRow = {
   id: string;
-  status?: string;
-  created_at?: string;
+  status?: string | null;
+  created_at?: string | null;
 };
 
 type OrderItemRow = {
@@ -57,23 +57,49 @@ type AppSettingRow = {
 
 type ReportRange = 'today' | 'week' | 'month' | 'all';
 
+type CategoryColorOption = {
+  value: string;
+  label: string;
+  textColor: string;
+};
+
 const DEFAULT_OWNER_USERNAME = 'Franco';
 const DEFAULT_OWNER_PASSWORD = '0000';
 
-const CATEGORY_PRESET_COLORS = [
-  '#111111',
-  '#dc2626',
-  '#f59e0b',
-  '#16a34a',
-  '#2563eb',
-  '#7c3aed',
-  '#db2777',
-  '#ea580c',
-  '#0891b2',
-  '#6b4f3a',
+const CATEGORY_COLOR_OPTIONS: CategoryColorOption[] = [
+  { value: '#111111', label: 'Grafite', textColor: '#ffffff' },
+  { value: '#991b1b', label: 'Rosso', textColor: '#ffffff' },
+  { value: '#c2410c', label: 'Arancio', textColor: '#ffffff' },
+  { value: '#d97706', label: 'Ambra', textColor: '#ffffff' },
+  { value: '#166534', label: 'Verde', textColor: '#ffffff' },
+  { value: '#0f766e', label: 'Turchese', textColor: '#ffffff' },
+  { value: '#1d4ed8', label: 'Blu', textColor: '#ffffff' },
+  { value: '#4338ca', label: 'Indaco', textColor: '#ffffff' },
+  { value: '#7e22ce', label: 'Viola', textColor: '#ffffff' },
+  { value: '#be185d', label: 'Fucsia', textColor: '#ffffff' },
+  { value: '#6b4f3a', label: 'Caffè', textColor: '#ffffff' },
+  { value: '#475569', label: 'Ardesia', textColor: '#ffffff' },
 ];
 
 const DEFAULT_CATEGORY_COLOR = '#111111';
+
+function getCategoryTextColor(bg: string) {
+  const normalized = bg.replace('#', '');
+  const fullHex =
+    normalized.length === 3
+      ? normalized
+          .split('')
+          .map((char) => char + char)
+          .join('')
+      : normalized;
+
+  const r = parseInt(fullHex.slice(0, 2), 16);
+  const g = parseInt(fullHex.slice(2, 4), 16);
+  const b = parseInt(fullHex.slice(4, 6), 16);
+
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+  return brightness > 160 ? '#111111' : '#ffffff';
+}
 
 export default function OwnerPage() {
   const router = useRouter();
@@ -81,13 +107,13 @@ export default function OwnerPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+
   const [ownerUsername, setOwnerUsername] = useState(DEFAULT_OWNER_USERNAME);
   const [ownerPassword, setOwnerPassword] = useState(DEFAULT_OWNER_PASSWORD);
-
   const [settingsUsername, setSettingsUsername] = useState(DEFAULT_OWNER_USERNAME);
   const [settingsPassword, setSettingsPassword] = useState(DEFAULT_OWNER_PASSWORD);
   const [credentialsOpen, setCredentialsOpen] = useState(false);
@@ -104,12 +130,12 @@ export default function OwnerPage() {
 
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryColor, setNewCategoryColor] = useState(DEFAULT_CATEGORY_COLOR);
+  const [showCustomCategoryColor, setShowCustomCategoryColor] = useState(false);
 
   const [newProductName, setNewProductName] = useState('');
   const [newProductPrice, setNewProductPrice] = useState('');
   const [newProductCategoryId, setNewProductCategoryId] = useState('');
-  const [newProductDestination, setNewProductDestination] =
-    useState<Destination>('bar');
+  const [newProductDestination, setNewProductDestination] = useState<Destination>('bar');
   const [newProductDescription, setNewProductDescription] = useState('');
 
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -126,10 +152,10 @@ export default function OwnerPage() {
     if (typeof window === 'undefined') return;
 
     const savedUsername =
-      window.localStorage.getItem('nur_owner_username') || DEFAULT_OWNER_USERNAME;
+      window.localStorage.getItem('nur-owner-username') ?? DEFAULT_OWNER_USERNAME;
     const savedPassword =
-      window.localStorage.getItem('nur_owner_password') || DEFAULT_OWNER_PASSWORD;
-    const savedAuth = window.localStorage.getItem('nur_owner_logged_in') === 'true';
+      window.localStorage.getItem('nur-owner-password') ?? DEFAULT_OWNER_PASSWORD;
+    const savedAuth = window.localStorage.getItem('nur-owner-logged-in') === 'true';
 
     setOwnerUsername(savedUsername);
     setOwnerPassword(savedPassword);
@@ -137,12 +163,10 @@ export default function OwnerPage() {
     setSettingsPassword(savedPassword);
     setIsAuthenticated(savedAuth);
 
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
     window.addEventListener('resize', checkMobile);
+
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
@@ -154,12 +178,13 @@ export default function OwnerPage() {
     }
   }, [isAuthenticated, reportRange]);
 
-  const isInSelectedRange = (dateString?: string) => {
+  function isInSelectedRange(dateString?: string | null) {
     if (!dateString) return reportRange === 'all';
     if (reportRange === 'all') return true;
 
     const now = new Date();
     const date = new Date(dateString);
+
     if (Number.isNaN(date.getTime())) return false;
 
     if (reportRange === 'today') {
@@ -183,10 +208,11 @@ export default function OwnerPage() {
     }
 
     return true;
-  };
+  }
 
-  const loadData = async () => {
+  async function loadData() {
     setLoading(true);
+
     try {
       const { data: categoriesData, error: categoriesError } = await supabase
         .from('menu_categories')
@@ -240,7 +266,6 @@ export default function OwnerPage() {
       }
 
       const orders = (ordersData as OrderRow[]) ?? [];
-
       const filteredOrders = orders.filter((order) => {
         const statusOk = order.status === 'chiuso' || !order.status;
         const dateOk = isInSelectedRange(order.created_at);
@@ -257,7 +282,9 @@ export default function OwnerPage() {
       if (orderItemsError) {
         console.error('Errore caricamento report order_items', orderItemsError);
       } else {
-        const rows = (orderItemsData ?? []) as OrderItemRow[];
+        const rows = ((orderItemsData ?? []) as OrderItemRow[]).filter((row) =>
+          validOrderIds.has(row.order_id)
+        );
 
         const grouped: Record<
           string,
@@ -269,26 +296,24 @@ export default function OwnerPage() {
           }
         > = {};
 
-        rows
-          .filter((row) => validOrderIds.has(row.order_id))
-          .forEach((row) => {
-            const cleanName = row.item_name ?? 'Prodotto sconosciuto';
-            const isFuoriMenu = Boolean(row.is_fuori_menu);
-            const key = `${isFuoriMenu ? 'fuori' : 'menu'}::${cleanName}`;
+        rows.forEach((row) => {
+          const cleanName = row.item_name ?? 'Prodotto sconosciuto';
+          const isFuoriMenu = Boolean(row.is_fuori_menu);
+          const key = isFuoriMenu ? `fuori-menu-${cleanName}` : cleanName;
 
-            if (!grouped[key]) {
-              grouped[key] = {
-                item_name: cleanName,
-                total_quantity: 0,
-                total_revenue: 0,
-                is_fuori_menu: isFuoriMenu,
-              };
-            }
+          if (!grouped[key]) {
+            grouped[key] = {
+              item_name: cleanName,
+              total_quantity: 0,
+              total_revenue: 0,
+              is_fuori_menu: isFuoriMenu,
+            };
+          }
 
-            grouped[key].total_quantity += Number(row.quantity ?? 0);
-            grouped[key].total_revenue +=
-              Number(row.quantity ?? 0) * Number(row.price ?? 0);
-          });
+          grouped[key].total_quantity += Number(row.quantity ?? 0);
+          grouped[key].total_revenue +=
+            Number(row.quantity ?? 0) * Number(row.price ?? 0);
+        });
 
         const finalRows = Object.values(grouped).sort(
           (a, b) => b.total_quantity - a.total_quantity
@@ -299,15 +324,16 @@ export default function OwnerPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
+
     return menuItems.filter((item) => {
       const matchesSearch = !q || item.name.toLowerCase().includes(q);
       const matchesCategory =
-        selectedCategoryFilter === 'all' ||
-        item.category_id === selectedCategoryFilter;
+        selectedCategoryFilter === 'all' || item.category_id === selectedCategoryFilter;
+
       return matchesSearch && matchesCategory;
     });
   }, [menuItems, search, selectedCategoryFilter]);
@@ -315,37 +341,44 @@ export default function OwnerPage() {
   const filteredReportRows = useMemo(() => {
     const q = reportSearch.trim().toLowerCase();
     if (!q) return reportRows;
-    return reportRows.filter((row) =>
-      row.item_name.toLowerCase().includes(q)
-    );
+    return reportRows.filter((row) => row.item_name.toLowerCase().includes(q));
   }, [reportRows, reportSearch]);
 
-  const getCategoryName = (categoryId: string) => {
+  const selectedColorOption = useMemo(() => {
+    return (
+      CATEGORY_COLOR_OPTIONS.find(
+        (option) => option.value.toLowerCase() === newCategoryColor.toLowerCase()
+      ) ?? null
+    );
+  }, [newCategoryColor]);
+
+  function getCategoryName(categoryId: string) {
     const category = categories.find((c) => c.id === categoryId);
     return category?.name ?? 'Senza categoria';
-  };
+  }
 
-  const handleLogin = () => {
+  function handleLogin() {
     if (
       loginUsername.trim() === ownerUsername &&
       loginPassword.trim() === ownerPassword
     ) {
       setIsAuthenticated(true);
-      window.localStorage.setItem('nur_owner_logged_in', 'true');
+      window.localStorage.setItem('nur-owner-logged-in', 'true');
       setLoginPassword('');
       return;
     }
-    alert('Credenziali non corrette.');
-  };
 
-  const handleLogout = () => {
+    alert('Credenziali non corrette.');
+  }
+
+  function handleLogout() {
     setIsAuthenticated(false);
-    window.localStorage.setItem('nur_owner_logged_in', 'false');
+    window.localStorage.setItem('nur-owner-logged-in', 'false');
     setLoginUsername('');
     setLoginPassword('');
-  };
+  }
 
-  const handleSaveOwnerCredentials = () => {
+  function handleSaveOwnerCredentials() {
     const newUser = settingsUsername.trim();
     const newPass = settingsPassword.trim();
 
@@ -353,6 +386,7 @@ export default function OwnerPage() {
       alert('Inserisci un nome utente valido.');
       return;
     }
+
     if (!newPass) {
       alert('Inserisci una password valida.');
       return;
@@ -360,12 +394,14 @@ export default function OwnerPage() {
 
     setOwnerUsername(newUser);
     setOwnerPassword(newPass);
-    window.localStorage.setItem('nur_owner_username', newUser);
-    window.localStorage.setItem('nur_owner_password', newPass);
-    alert('Credenziali owner aggiornate con successo.');
-  };
 
-  const handleSaveMaxCapacity = async () => {
+    window.localStorage.setItem('nur-owner-username', newUser);
+    window.localStorage.setItem('nur-owner-password', newPass);
+
+    alert('Credenziali owner aggiornate con successo.');
+  }
+
+  async function handleSaveMaxCapacity() {
     const parsed = Number(maxCapacity);
 
     if (!Number.isInteger(parsed) || parsed < 0) {
@@ -374,16 +410,15 @@ export default function OwnerPage() {
     }
 
     setSavingCapacity(true);
+
     try {
-      const { error } = await supabase
-        .from('app_settings')
-        .upsert(
-          {
-            key: 'max_capacity',
-            value_number: parsed,
-          },
-          { onConflict: 'key' }
-        );
+      const { error } = await supabase.from('app_settings').upsert(
+        {
+          key: 'max_capacity',
+          value_number: parsed,
+        },
+        { onConflict: 'key' }
+      );
 
       if (error) {
         console.error('Errore salvataggio capienza massima', error);
@@ -395,9 +430,9 @@ export default function OwnerPage() {
     } finally {
       setSavingCapacity(false);
     }
-  };
+  }
 
-  const handleCreateCategory = async () => {
+  async function handleCreateCategory() {
     const name = newCategoryName.trim();
     const color = newCategoryColor.trim() || DEFAULT_CATEGORY_COLOR;
 
@@ -407,6 +442,7 @@ export default function OwnerPage() {
     }
 
     setSaving(true);
+
     try {
       const { data, error } = await supabase
         .from('menu_categories')
@@ -428,28 +464,26 @@ export default function OwnerPage() {
       setCategories(updated);
       setNewCategoryName('');
       setNewCategoryColor(DEFAULT_CATEGORY_COLOR);
+      setShowCustomCategoryColor(false);
       setNewProductCategoryId(created.id);
     } finally {
       setSaving(false);
     }
-  };
+  }
 
-  const handleDeleteCategory = async (categoryId: string) => {
+  async function handleDeleteCategory(categoryId: string) {
     const linkedItems = menuItems.filter((item) => item.category_id === categoryId);
+
     if (linkedItems.length > 0) {
       alert('Non puoi eliminare una categoria che contiene prodotti.');
       return;
     }
 
     if (!window.confirm('Vuoi eliminare questa categoria?')) return;
-    if (
-      !window.confirm(
-        'Confermi di voler eliminare definitivamente questa categoria vuota?'
-      )
-    )
-      return;
+    if (!window.confirm('Confermi di voler eliminare definitivamente questa categoria vuota?')) return;
 
     setSaving(true);
+
     try {
       const { error } = await supabase
         .from('menu_categories')
@@ -458,19 +492,25 @@ export default function OwnerPage() {
 
       if (error) {
         console.error('Errore eliminazione categoria', error);
-        alert("Errore durante l'eliminazione della categoria.");
+        alert('Errore durante l’eliminazione della categoria.');
         return;
       }
 
       setCategories((prev) => prev.filter((c) => c.id !== categoryId));
-      if (selectedCategoryFilter === categoryId) setSelectedCategoryFilter('all');
-      if (newProductCategoryId === categoryId) setNewProductCategoryId('');
+
+      if (selectedCategoryFilter === categoryId) {
+        setSelectedCategoryFilter('all');
+      }
+
+      if (newProductCategoryId === categoryId) {
+        setNewProductCategoryId('');
+      }
     } finally {
       setSaving(false);
     }
-  };
+  }
 
-  const handleCreateProduct = async () => {
+  async function handleCreateProduct() {
     const name = newProductName.trim();
     const price = Number(newProductPrice.replace(',', '.'));
     const categoryId = newProductCategoryId;
@@ -480,16 +520,19 @@ export default function OwnerPage() {
       alert('Inserisci il nome del prodotto.');
       return;
     }
+
     if (!categoryId) {
       alert('Seleziona una categoria.');
       return;
     }
+
     if (!price || price <= 0) {
       alert('Inserisci un prezzo valido.');
       return;
     }
 
     setSaving(true);
+
     try {
       const { data, error } = await supabase
         .from('menu_items')
@@ -519,31 +562,32 @@ export default function OwnerPage() {
       setNewProductPrice('');
       setNewProductDestination('bar');
       setNewProductDescription('');
+
       await loadData();
     } finally {
       setSaving(false);
     }
-  };
+  }
 
-  const startEditItem = (item: MenuItem) => {
+  function startEditItem(item: MenuItem) {
     setEditingItemId(item.id);
     setEditName(item.name);
     setEditPrice(String(item.price));
     setEditCategoryId(item.category_id);
     setEditDestination(item.destination ?? 'bar');
     setEditDescription(item.description ?? '');
-  };
+  }
 
-  const cancelEditItem = () => {
+  function cancelEditItem() {
     setEditingItemId(null);
     setEditName('');
     setEditPrice('');
     setEditCategoryId('');
     setEditDestination('bar');
     setEditDescription('');
-  };
+  }
 
-  const handleSaveItem = async () => {
+  async function handleSaveItem() {
     if (!editingItemId) return;
 
     const name = editName.trim();
@@ -555,16 +599,19 @@ export default function OwnerPage() {
       alert('Inserisci il nome del prodotto.');
       return;
     }
+
     if (!categoryId) {
       alert('Seleziona una categoria.');
       return;
     }
+
     if (!price || price <= 0) {
       alert('Inserisci un prezzo valido.');
       return;
     }
 
     setSaving(true);
+
     try {
       const { data, error } = await supabase
         .from('menu_items')
@@ -586,6 +633,7 @@ export default function OwnerPage() {
       }
 
       const updated = data as MenuItem;
+
       setMenuItems((prev) =>
         prev
           .map((item) => (item.id === editingItemId ? updated : item))
@@ -597,9 +645,9 @@ export default function OwnerPage() {
     } finally {
       setSaving(false);
     }
-  };
+  }
 
-  const handleDeleteItem = async (itemId: string, itemName: string) => {
+  async function handleDeleteItem(itemId: string, itemName: string) {
     if (!window.confirm(`Vuoi eliminare il prodotto "${itemName}" dal menu?`)) return;
     if (
       !window.confirm(
@@ -609,27 +657,29 @@ export default function OwnerPage() {
       return;
 
     setSaving(true);
+
     try {
-      const { error } = await supabase
-        .from('menu_items')
-        .delete()
-        .eq('id', itemId);
+      const { error } = await supabase.from('menu_items').delete().eq('id', itemId);
 
       if (error) {
         console.error('Errore eliminazione prodotto', error);
-        alert("Errore durante l'eliminazione del prodotto.");
+        alert('Errore durante l’eliminazione del prodotto.');
         return;
       }
 
       setMenuItems((prev) => prev.filter((item) => item.id !== itemId));
-      if (editingItemId === itemId) cancelEditItem();
+
+      if (editingItemId === itemId) {
+        cancelEditItem();
+      }
+
       await loadData();
     } finally {
       setSaving(false);
     }
-  };
+  }
 
-  const handleDeleteHistoricalReportData = async () => {
+  async function handleDeleteHistoricalReportData() {
     if (reportOrderIds.length === 0) {
       alert('Non ci sono dati storici da eliminare nel periodo selezionato.');
       return;
@@ -641,6 +691,7 @@ export default function OwnerPage() {
       )
     )
       return;
+
     if (
       !window.confirm(
         'Seconda conferma: verranno eliminati ordini e righe ordine collegate al report. Sei sicuro?'
@@ -651,12 +702,14 @@ export default function OwnerPage() {
     const typed = window.prompt(
       'Terza conferma obbligatoria: scrivi ELIMINA per procedere definitivamente.'
     );
+
     if (typed !== 'ELIMINA') {
       alert('Conferma finale non valida. Nessun dato eliminato.');
       return;
     }
 
     setSaving(true);
+
     try {
       const { error: orderItemsDeleteError } = await supabase
         .from('order_items')
@@ -664,11 +717,8 @@ export default function OwnerPage() {
         .in('order_id', reportOrderIds);
 
       if (orderItemsDeleteError) {
-        console.error(
-          'Errore eliminazione order_items storico',
-          orderItemsDeleteError
-        );
-        alert("Errore durante l'eliminazione delle righe storiche del report.");
+        console.error('Errore eliminazione order_items storico', orderItemsDeleteError);
+        alert('Errore durante l’eliminazione delle righe storiche del report.');
         return;
       }
 
@@ -679,7 +729,7 @@ export default function OwnerPage() {
 
       if (ordersDeleteError) {
         console.error('Errore eliminazione orders storico', ordersDeleteError);
-        alert("Errore durante l'eliminazione degli ordini storici.");
+        alert('Errore durante l’eliminazione degli ordini storici.');
         return;
       }
 
@@ -688,62 +738,65 @@ export default function OwnerPage() {
     } finally {
       setSaving(false);
     }
-  };
+  }
 
-  const DestinationToggle = ({
+  function DestinationToggle({
     value,
     onChange,
   }: {
     value: Destination;
     onChange: (v: Destination) => void;
-  }) => (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: 6,
-        width: '100%',
-        minWidth: 0,
-      }}
-    >
-      <button
-        type="button"
-        onClick={() => onChange('bar')}
+  }) {
+    return (
+      <div
         style={{
-          padding: '7px 6px',
-          borderRadius: 6,
-          border: `1.5px solid ${value === 'bar' ? '#1e40af' : '#ccc'}`,
-          backgroundColor: value === 'bar' ? '#dbeafe' : '#fff',
-          color: value === 'bar' ? '#1e40af' : '#666',
-          fontWeight: 700,
-          fontSize: 11,
-          cursor: 'pointer',
-          minHeight: 34,
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: 6,
+          width: '100%',
           minWidth: 0,
         }}
       >
-        BAR
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange('kitchen')}
-        style={{
-          padding: '7px 6px',
-          borderRadius: 6,
-          border: `1.5px solid ${value === 'kitchen' ? '#92400e' : '#ccc'}`,
-          backgroundColor: value === 'kitchen' ? '#fef3c7' : '#fff',
-          color: value === 'kitchen' ? '#92400e' : '#666',
-          fontWeight: 700,
-          fontSize: 11,
-          cursor: 'pointer',
-          minHeight: 34,
-          minWidth: 0,
-        }}
-      >
-        CUCINA
-      </button>
-    </div>
-  );
+        <button
+          type="button"
+          onClick={() => onChange('bar')}
+          style={{
+            padding: '7px 6px',
+            borderRadius: 6,
+            border: `1.5px solid ${value === 'bar' ? '#1e40af' : '#ccc'}`,
+            backgroundColor: value === 'bar' ? '#dbeafe' : '#fff',
+            color: value === 'bar' ? '#1e40af' : '#666',
+            fontWeight: 700,
+            fontSize: 11,
+            cursor: 'pointer',
+            minHeight: 34,
+            minWidth: 0,
+          }}
+        >
+          BAR
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onChange('kitchen')}
+          style={{
+            padding: '7px 6px',
+            borderRadius: 6,
+            border: `1.5px solid ${value === 'kitchen' ? '#92400e' : '#ccc'}`,
+            backgroundColor: value === 'kitchen' ? '#fef3c7' : '#fff',
+            color: value === 'kitchen' ? '#92400e' : '#666',
+            fontWeight: 700,
+            fontSize: 11,
+            cursor: 'pointer',
+            minHeight: 34,
+            minWidth: 0,
+          }}
+        >
+          CUCINA
+        </button>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (
@@ -751,7 +804,7 @@ export default function OwnerPage() {
         <div style={styles.loginCard}>
           <h1 style={styles.title}>Accesso Owner</h1>
           <p style={styles.subtitle}>
-            Inserisci credenziali per entrare nell&apos;area amministrazione
+            Inserisci credenziali per entrare nell&apos;area amministrazione.
           </p>
 
           <div style={styles.formGrid}>
@@ -765,6 +818,7 @@ export default function OwnerPage() {
                 style={styles.input}
               />
             </div>
+
             <div>
               <label style={styles.label}>Password</label>
               <input
@@ -778,11 +832,7 @@ export default function OwnerPage() {
           </div>
 
           <div style={styles.stackButtonsCompact}>
-            <button
-              type="button"
-              onClick={handleLogin}
-              style={styles.primaryButtonWide}
-            >
+            <button type="button" onClick={handleLogin} style={styles.primaryButtonWide}>
               Entra
             </button>
             <button
@@ -804,7 +854,7 @@ export default function OwnerPage() {
         <div style={{ flex: 1, minWidth: 0 }}>
           <h1 style={styles.title}>Dashboard Owner</h1>
           <p style={styles.subtitle}>
-            Gestione menu, credenziali, report e accesso rapido alle prenotazioni
+            Gestione menu, credenziali, report e accesso rapido alle prenotazioni.
           </p>
         </div>
 
@@ -816,13 +866,15 @@ export default function OwnerPage() {
           >
             Apri Calendar
           </button>
+
           <button
             type="button"
             onClick={() => router.push('/')}
             style={isMobile ? styles.secondaryButtonHalf : styles.secondaryButton}
           >
-            ← Home
+            Home
           </button>
+
           <button
             type="button"
             onClick={handleLogout}
@@ -850,7 +902,7 @@ export default function OwnerPage() {
                 style={styles.accordionButton}
               >
                 <span>Credenziali owner</span>
-                <span>{credentialsOpen ? '▴' : '▾'}</span>
+                <span>{credentialsOpen ? '−' : '+'}</span>
               </button>
 
               {credentialsOpen && (
@@ -865,6 +917,7 @@ export default function OwnerPage() {
                         style={styles.input}
                       />
                     </div>
+
                     <div>
                       <label style={styles.label}>Password</label>
                       <input
@@ -895,30 +948,30 @@ export default function OwnerPage() {
                 Imposta il numero massimo totale di coperti gestibili dal locale.
               </p>
 
-              <div style={{ marginTop: 8 }} />
+              <div style={{ marginTop: 8 }}>
+                <div style={styles.formColumnTight}>
+                  <div>
+                    <label style={styles.label}>Capienza massima</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={maxCapacity}
+                      onChange={(e) => setMaxCapacity(e.target.value)}
+                      placeholder="Es. 80"
+                      style={styles.input}
+                    />
+                  </div>
 
-              <div style={styles.formColumnTight}>
-                <div>
-                  <label style={styles.label}>Capienza massima</label>
-                  <input
-                    type="number"
-                    min={0}
-                    step={1}
-                    value={maxCapacity}
-                    onChange={(e) => setMaxCapacity(e.target.value)}
-                    placeholder="Es. 80"
-                    style={styles.input}
-                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveMaxCapacity}
+                    style={styles.primaryButtonWide}
+                    disabled={savingCapacity}
+                  >
+                    {savingCapacity ? 'Salvataggio...' : 'Salva capienza'}
+                  </button>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={handleSaveMaxCapacity}
-                  style={styles.primaryButtonWide}
-                  disabled={savingCapacity}
-                >
-                  {savingCapacity ? 'Salvataggio...' : 'Salva capienza'}
-                </button>
               </div>
             </div>
 
@@ -935,75 +988,237 @@ export default function OwnerPage() {
                 />
 
                 <div>
-                  <label style={styles.label}>Colore categoria</label>
+                  <label style={styles.label}>Scegli colore categoria</label>
 
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
-                      gap: 6,
+                      gridTemplateColumns: isMobile
+                        ? 'repeat(2, minmax(0, 1fr))'
+                        : 'repeat(2, minmax(0, 1fr))',
+                      gap: 8,
                     }}
                   >
-                    {CATEGORY_PRESET_COLORS.map((color) => {
-                      const selected = newCategoryColor === color;
+                    {CATEGORY_COLOR_OPTIONS.map((option) => {
+                      const selected =
+                        option.value.toLowerCase() === newCategoryColor.toLowerCase();
 
                       return (
                         <button
-                          key={color}
+                          key={option.value}
                           type="button"
-                          onClick={() => setNewCategoryColor(color)}
-                          title={color}
-                          style={{
-                            height: 32,
-                            borderRadius: 8,
-                            border: selected ? '3px solid #111' : '1px solid #d1d5db',
-                            backgroundColor: color,
-                            cursor: 'pointer',
-                            minWidth: 0,
+                          onClick={() => {
+                            setNewCategoryColor(option.value);
+                            setShowCustomCategoryColor(false);
                           }}
-                        />
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10,
+                            width: '100%',
+                            minWidth: 0,
+                            minHeight: 44,
+                            padding: '8px 10px',
+                            borderRadius: 10,
+                            border: selected ? '2px solid #111' : '1px solid #d6d6d6',
+                            background: selected ? '#f7f7f7' : '#fff',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            boxSizing: 'border-box',
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: 22,
+                              height: 22,
+                              borderRadius: 999,
+                              backgroundColor: option.value,
+                              border: '1px solid rgba(0,0,0,0.12)',
+                              flexShrink: 0,
+                            }}
+                          />
+
+                          <div
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 2,
+                              minWidth: 0,
+                              flex: 1,
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 700,
+                                color: '#111',
+                                overflowWrap: 'anywhere',
+                              }}
+                            >
+                              {option.label}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: 10,
+                                color: '#666',
+                                overflowWrap: 'anywhere',
+                              }}
+                            >
+                              {option.value}
+                            </span>
+                          </div>
+
+                          {selected && (
+                            <span
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 800,
+                                color: '#111',
+                                flexShrink: 0,
+                              }}
+                            >
+                              ✓
+                            </span>
+                          )}
+                        </button>
                       );
                     })}
                   </div>
 
                   <div
                     style={{
-                      marginTop: 8,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      minWidth: 0,
+                      marginTop: 10,
+                      padding: 10,
+                      border: '1px solid #e5e7eb',
+                      borderRadius: 10,
+                      background: '#fafafa',
                     }}
                   >
                     <div
                       style={{
-                        width: 18,
-                        height: 18,
-                        borderRadius: 999,
-                        backgroundColor: newCategoryColor,
-                        border: '1px solid #ccc',
-                        flexShrink: 0,
-                      }}
-                    />
-                    <span
-                      style={{
-                        fontSize: 12,
-                        color: '#444',
-                        overflowWrap: 'anywhere',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: '#555',
+                        marginBottom: 8,
                       }}
                     >
-                      {newCategoryColor}
-                    </span>
-                  </div>
-                </div>
+                      Anteprima categoria
+                    </div>
 
-                <button
-                  type="button"
-                  onClick={handleCreateCategory}
-                  style={styles.primaryButtonWide}
-                >
-                  Aggiungi
-                </button>
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        minHeight: 34,
+                        padding: '7px 10px',
+                        borderRadius: 999,
+                        backgroundColor: newCategoryColor,
+                        color: getCategoryTextColor(newCategoryColor),
+                        border: '1px solid rgba(0,0,0,0.08)',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        maxWidth: '100%',
+                        boxSizing: 'border-box',
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: 999,
+                          background:
+                            getCategoryTextColor(newCategoryColor) === '#ffffff'
+                              ? 'rgba(255,255,255,0.92)'
+                              : 'rgba(17,17,17,0.88)',
+                          flexShrink: 0,
+                        }}
+                      />
+                      <span style={{ overflowWrap: 'anywhere' }}>
+                        {newCategoryName.trim() || 'Nome categoria'}
+                      </span>
+                    </div>
+
+                    <div style={{ marginTop: 8, fontSize: 11, color: '#666' }}>
+                      Questo è il look consigliato per distinguere meglio le categorie
+                      quando prendi l’ordine.
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 10 }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomCategoryColor((prev) => !prev)}
+                      style={{
+                        ...styles.secondaryButtonWide,
+                        minHeight: 32,
+                        fontSize: 12,
+                      }}
+                    >
+                      {showCustomCategoryColor
+                        ? 'Nascondi colore personalizzato'
+                        : 'Usa colore personalizzato'}
+                    </button>
+                  </div>
+
+                  {showCustomCategoryColor && (
+                    <div
+                      style={{
+                        marginTop: 8,
+                        padding: 10,
+                        borderRadius: 10,
+                        border: '1px solid #ddd',
+                        background: '#fff',
+                      }}
+                    >
+                      <label style={styles.label}>Colore personalizzato</label>
+
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: 10,
+                          alignItems: 'center',
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <input
+                          type="color"
+                          value={newCategoryColor}
+                          onChange={(e) => setNewCategoryColor(e.target.value)}
+                          style={{
+                            width: 52,
+                            height: 38,
+                            border: '1px solid #ccc',
+                            borderRadius: 8,
+                            padding: 2,
+                            background: '#fff',
+                            cursor: 'pointer',
+                          }}
+                        />
+
+                        <input
+                          type="text"
+                          value={newCategoryColor}
+                          onChange={(e) => setNewCategoryColor(e.target.value)}
+                          placeholder="#111111"
+                          style={{
+                            ...styles.input,
+                            flex: 1,
+                            minWidth: 120,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleCreateCategory}
+                    style={styles.primaryButtonWide}
+                  >
+                    Aggiungi categoria
+                  </button>
+                </div>
               </div>
 
               <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
@@ -1012,9 +1227,11 @@ export default function OwnerPage() {
                   onClick={() => setSelectedCategoryFilter('all')}
                   style={{
                     ...styles.categoryLineButton,
-                    backgroundColor: selectedCategoryFilter === 'all' ? '#111' : '#fff',
+                    backgroundColor:
+                      selectedCategoryFilter === 'all' ? '#111' : '#fff',
                     color: selectedCategoryFilter === 'all' ? '#fff' : '#111',
-                    borderColor: selectedCategoryFilter === 'all' ? '#111' : '#ddd',
+                    borderColor:
+                      selectedCategoryFilter === 'all' ? '#111' : '#ddd',
                   }}
                 >
                   Tutte le categorie
@@ -1024,9 +1241,9 @@ export default function OwnerPage() {
                   const count = menuItems.filter(
                     (item) => item.category_id === category.id
                   ).length;
-
                   const active = selectedCategoryFilter === category.id;
                   const categoryColor = category.color || DEFAULT_CATEGORY_COLOR;
+                  const textColor = getCategoryTextColor(categoryColor);
 
                   return (
                     <div key={category.id} style={styles.categoryRowSingle}>
@@ -1038,7 +1255,7 @@ export default function OwnerPage() {
                           flex: 1,
                           minWidth: 0,
                           backgroundColor: active ? categoryColor : '#fff',
-                          color: active ? '#fff' : '#111',
+                          color: active ? textColor : '#111',
                           borderColor: active ? categoryColor : '#ddd',
                         }}
                       >
@@ -1133,7 +1350,7 @@ export default function OwnerPage() {
                 </div>
 
                 <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={styles.label}>Descrizione / ingredienti</label>
+                  <label style={styles.label}>Descrizione ingredienti</label>
                   <textarea
                     value={newProductDescription}
                     onChange={(e) => setNewProductDescription(e.target.value)}
@@ -1157,11 +1374,7 @@ export default function OwnerPage() {
 
           <section style={styles.rightColumn}>
             <div style={styles.cardCompact}>
-              <div
-                style={
-                  isMobile ? styles.productsHeaderMobile : styles.productsHeader
-                }
-              >
+              <div style={isMobile ? styles.productsHeaderMobile : styles.productsHeader}>
                 <div style={{ minWidth: 0 }}>
                   <h2 style={styles.sectionTitle}>Prodotti menu</h2>
                   <p style={styles.smallText}>
@@ -1200,6 +1413,7 @@ export default function OwnerPage() {
                       <th style={styles.th}>Azioni</th>
                     </tr>
                   </thead>
+
                   <tbody>
                     {filteredItems.length === 0 ? (
                       <tr>
@@ -1231,9 +1445,7 @@ export default function OwnerPage() {
                                     minWidth: 0,
                                   }}
                                 >
-                                  <span style={{ overflowWrap: 'anywhere' }}>
-                                    {item.name}
-                                  </span>
+                                  <span style={{ overflowWrap: 'anywhere' }}>{item.name}</span>
                                   {item.is_fuori_menu && (
                                     <span
                                       style={{
@@ -1282,7 +1494,7 @@ export default function OwnerPage() {
                                   style={styles.input}
                                 />
                               ) : (
-                                `€ ${Number(item.price).toFixed(2)}`
+                                Number(item.price).toFixed(2)
                               )}
                             </td>
 
@@ -1300,13 +1512,9 @@ export default function OwnerPage() {
                                     padding: '3px 6px',
                                     borderRadius: 999,
                                     backgroundColor:
-                                      item.destination === 'kitchen'
-                                        ? '#fef3c7'
-                                        : '#dbeafe',
+                                      item.destination === 'kitchen' ? '#fef3c7' : '#dbeafe',
                                     color:
-                                      item.destination === 'kitchen'
-                                        ? '#92400e'
-                                        : '#1e40af',
+                                      item.destination === 'kitchen' ? '#92400e' : '#1e40af',
                                     whiteSpace: 'nowrap',
                                     display: 'inline-block',
                                   }}
@@ -1321,13 +1529,11 @@ export default function OwnerPage() {
                                 <textarea
                                   value={editDescription}
                                   onChange={(e) => setEditDescription(e.target.value)}
-                                  placeholder="Descrizione / ingredienti"
+                                  placeholder="Descrizione ingredienti"
                                   style={styles.textareaSmall}
                                 />
                               ) : item.description ? (
-                                <div style={styles.descriptionPreview}>
-                                  {item.description}
-                                </div>
+                                <div style={styles.descriptionPreview}>{item.description}</div>
                               ) : (
                                 <span style={{ color: '#999', fontSize: 12 }}>—</span>
                               )}
@@ -1335,9 +1541,7 @@ export default function OwnerPage() {
 
                             <td style={styles.td}>
                               <div
-                                style={
-                                  isMobile ? styles.actionsColumn : styles.actionsRow
-                                }
+                                style={isMobile ? styles.actionsColumn : styles.actionsRow}
                               >
                                 {isEditing ? (
                                   <>
@@ -1379,9 +1583,7 @@ export default function OwnerPage() {
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() =>
-                                        handleDeleteItem(item.id, item.name)
-                                      }
+                                      onClick={() => handleDeleteItem(item.id, item.name)}
                                       style={
                                         isMobile
                                           ? styles.redButtonMiniWide
@@ -1404,28 +1606,16 @@ export default function OwnerPage() {
             </div>
 
             <div style={styles.cardCompact}>
-              <div
-                style={
-                  isMobile ? styles.productsHeaderMobile : styles.productsHeader
-                }
-              >
+              <div style={isMobile ? styles.productsHeaderMobile : styles.productsHeader}>
                 <div style={{ minWidth: 0 }}>
                   <h2 style={styles.sectionTitle}>Report prodotti più venduti</h2>
-                  <p style={styles.smallText}>
-                    Classifica consumi per singolo prodotto.
-                  </p>
+                  <p style={styles.smallText}>Classifica consumi per singolo prodotto.</p>
                 </div>
 
-                <div
-                  style={
-                    isMobile ? styles.reportControlsMobile : styles.reportControls
-                  }
-                >
+                <div style={isMobile ? styles.reportControlsMobile : styles.reportControls}>
                   <select
                     value={reportRange}
-                    onChange={(e) =>
-                      setReportRange(e.target.value as ReportRange)
-                    }
+                    onChange={(e) => setReportRange(e.target.value as ReportRange)}
                     style={{
                       ...styles.input,
                       minWidth: isMobile ? 0 : 130,
@@ -1460,13 +1650,7 @@ export default function OwnerPage() {
                 >
                   ELIMINA DATI STORICI REPORT
                 </button>
-                <p
-                  style={{
-                    ...styles.smallText,
-                    marginTop: 6,
-                    color: '#991b1b',
-                  }}
-                >
+                <p style={{ ...styles.smallText, marginTop: 6, color: '#991b1b' }}>
                   Elimina ordini e righe ordine del periodo selezionato.
                 </p>
               </div>
@@ -1481,6 +1665,7 @@ export default function OwnerPage() {
                       <th style={styles.th}>Incasso</th>
                     </tr>
                   </thead>
+
                   <tbody>
                     {filteredReportRows.length === 0 ? (
                       <tr>
@@ -1502,9 +1687,7 @@ export default function OwnerPage() {
                                 minWidth: 0,
                               }}
                             >
-                              <span style={{ overflowWrap: 'anywhere' }}>
-                                {row.item_name}
-                              </span>
+                              <span style={{ overflowWrap: 'anywhere' }}>{row.item_name}</span>
                               {row.is_fuori_menu && (
                                 <span
                                   style={{
@@ -1524,9 +1707,7 @@ export default function OwnerPage() {
                             </div>
                           </td>
                           <td style={styles.td}>{row.total_quantity}</td>
-                          <td style={styles.td}>
-                            € {row.total_revenue.toFixed(2)}
-                          </td>
+                          <td style={styles.td}>{row.total_revenue.toFixed(2)}</td>
                         </tr>
                       ))
                     )}
