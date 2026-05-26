@@ -90,6 +90,9 @@ export default function StaffPage() {
   const [search, setSearch] = useState('');
   const [newTableName, setNewTableName] = useState('');
   const [statusMenuTableId, setStatusMenuTableId] = useState<string | null>(null);
+  const [editingTableId, setEditingTableId] = useState<string | null>(null);
+  const [editingTableName, setEditingTableName] = useState('');
+  const [tableActionLoadingId, setTableActionLoadingId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [showMap, setShowMap] = useState(true);
   const [isLayoutMode, setIsLayoutMode] = useState(false);
@@ -351,35 +354,166 @@ export default function StaffPage() {
 
   async function handleAddTable() {
     const name = newTableName.trim();
+
     if (!name) {
       alert('Inserisci il nome del tavolo.');
+      return;
+    }
+
+    const duplicated = baseTables.some(
+      (table) => table.name.trim().toLowerCase() === name.toLowerCase()
+    );
+
+    if (duplicated) {
+      alert('Esiste già un tavolo con questo nome.');
       return;
     }
 
     const startX = snapToGrid(PLAYABLE_MIN_X + 20);
     const startY = snapToGrid(PLAYABLE_MIN_Y + 20);
 
-    const { data, error } = await supabase
-      .from('tables')
-      .insert({
-        name,
-        x: startX,
-        y: startY,
-        status: 'libero',
-      })
-      .select()
-      .single();
+    setTableActionLoadingId('new-table');
 
-    if (error) {
-      console.error('Errore creazione tavolo', error);
-      alert('Errore nella creazione del tavolo.');
+    try {
+      const { data, error } = await supabase
+        .from('tables')
+        .insert({
+          name,
+          x: startX,
+          y: startY,
+          status: 'libero',
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Errore creazione tavolo', error);
+        alert('Errore nella creazione del tavolo.');
+        return;
+      }
+
+      setBaseTables((prev) =>
+        [...prev, data as TableRow].sort((a, b) => a.name.localeCompare(b.name))
+      );
+      setNewTableName('');
+    } finally {
+      setTableActionLoadingId(null);
+    }
+  }
+
+  function startRenameTable(table: DerivedTableRow) {
+    setEditingTableId(table.id);
+    setEditingTableName(table.name);
+    setStatusMenuTableId(null);
+  }
+
+  function cancelRenameTable() {
+    setEditingTableId(null);
+    setEditingTableName('');
+  }
+
+  async function handleRenameTable(tableId: string) {
+    const nextName = editingTableName.trim();
+
+    if (!nextName) {
+      alert('Inserisci un nome tavolo valido.');
       return;
     }
 
-    setBaseTables((prev) =>
-      [...prev, data as TableRow].sort((a, b) => a.name.localeCompare(b.name))
+    const duplicated = baseTables.some(
+      (table) =>
+        table.id !== tableId && table.name.trim().toLowerCase() === nextName.toLowerCase()
     );
-    setNewTableName('');
+
+    if (duplicated) {
+      alert('Esiste già un tavolo con questo nome.');
+      return;
+    }
+
+    setTableActionLoadingId(tableId);
+
+    try {
+      const { data, error } = await supabase
+        .from('tables')
+        .update({ name: nextName })
+        .eq('id', tableId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Errore rinomina tavolo', error);
+        alert('Errore durante la modifica del nome tavolo.');
+        return;
+      }
+
+      const updated = data as TableRow;
+
+      setBaseTables((prev) =>
+        prev
+          .map((table) => (table.id === tableId ? updated : table))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      );
+
+      setEditingTableId(null);
+      setEditingTableName('');
+    } finally {
+      setTableActionLoadingId(null);
+    }
+  }
+
+  async function handleDeleteTable(table: DerivedTableRow) {
+    const hasOpenReservation = table.hasReservationForSelectedDate;
+    const hasAnyOrderRisk =
+      table.derivedStatus === 'occupato' || table.derivedStatus === 'prenotato';
+
+    if (hasOpenReservation) {
+      alert(
+        'Non puoi eliminare un tavolo prenotato nel giorno selezionato. Rimuovi o annulla prima la prenotazione.'
+      );
+      return;
+    }
+
+    if (hasAnyOrderRisk) {
+      const confirmBusy = window.confirm(
+        `Il tavolo "${table.name}" non risulta libero. Vuoi davvero continuare?`
+      );
+      if (!confirmBusy) return;
+    }
+
+    const confirmDelete = window.confirm(
+      `Vuoi eliminare definitivamente il tavolo "${table.name}"?`
+    );
+    if (!confirmDelete) return;
+
+    const secondConfirm = window.confirm(
+      `Conferma definitiva: eliminare "${table.name}" dalla sala?`
+    );
+    if (!secondConfirm) return;
+
+    setTableActionLoadingId(table.id);
+
+    try {
+      const { error } = await supabase.from('tables').delete().eq('id', table.id);
+
+      if (error) {
+        console.error('Errore eliminazione tavolo', error);
+        alert('Errore durante l’eliminazione del tavolo.');
+        return;
+      }
+
+      setBaseTables((prev) => prev.filter((item) => item.id !== table.id));
+
+      if (editingTableId === table.id) {
+        setEditingTableId(null);
+        setEditingTableName('');
+      }
+
+      if (statusMenuTableId === table.id) {
+        setStatusMenuTableId(null);
+      }
+    } finally {
+      setTableActionLoadingId(null);
+    }
   }
 
   async function handleChangeStatus(tableId: string, status: TableStatus) {
@@ -1067,11 +1201,16 @@ export default function StaffPage() {
               Aggiungi tavolo
             </h2>
 
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <input
                 type="text"
                 value={newTableName}
                 onChange={(e) => setNewTableName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    void handleAddTable();
+                  }
+                }}
                 placeholder="Es. T12"
                 style={{
                   flex: 1,
@@ -1085,17 +1224,19 @@ export default function StaffPage() {
               <button
                 type="button"
                 onClick={handleAddTable}
+                disabled={tableActionLoadingId === 'new-table'}
                 style={{
                   padding: '10px 12px',
                   borderRadius: 8,
                   border: 'none',
                   background: '#111',
                   color: '#fff',
-                  cursor: 'pointer',
+                  cursor: tableActionLoadingId === 'new-table' ? 'not-allowed' : 'pointer',
                   fontWeight: 700,
+                  opacity: tableActionLoadingId === 'new-table' ? 0.7 : 1,
                 }}
               >
-                Aggiungi
+                {tableActionLoadingId === 'new-table' ? 'Salvataggio...' : 'Aggiungi'}
               </button>
             </div>
           </section>
@@ -1148,65 +1289,213 @@ export default function StaffPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {filteredTables.map((table) => {
                 const colors = getStatusColors(table.derivedStatus);
+                const isEditing = editingTableId === table.id;
+                const isBusy = tableActionLoadingId === table.id;
 
                 return (
                   <div
                     key={table.id}
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '1fr auto',
                       gap: 8,
-                      alignItems: 'center',
                     }}
                   >
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setStatusMenuTableId((prev) =>
-                          prev === table.id ? null : table.id
-                        );
-                      }}
+                    <div
                       style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        borderRadius: 10,
-                        border: `2px solid ${colors.border}`,
-                        background: colors.bg,
-                        color: colors.text,
-                        fontWeight: 800,
-                        fontSize: 14,
-                        textAlign: 'left',
-                        cursor: 'pointer',
+                        display: 'grid',
+                        gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) auto',
+                        gap: 8,
+                        alignItems: 'center',
                       }}
                     >
-                      {table.name} · {table.derivedStatus}
-                      {table.hasReservationForSelectedDate ? ' · da calendario' : ''}
-                    </button>
+                      {!isEditing ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setStatusMenuTableId((prev) => (prev === table.id ? null : table.id));
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '10px 12px',
+                              borderRadius: 10,
+                              border: `2px solid ${colors.border}`,
+                              background: colors.bg,
+                              color: colors.text,
+                              fontWeight: 800,
+                              fontSize: 14,
+                              textAlign: 'left',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {table.name} • {table.derivedStatus}
+                            {table.hasReservationForSelectedDate ? ' • da calendario' : ''}
+                          </button>
 
-                    <button
-                      type="button"
-                      onClick={() => router.push(`/staff/table/${table.id}`)}
-                      style={{
-                        padding: '10px 12px',
-                        borderRadius: 10,
-                        border: '1px solid #111',
-                        background: '#111',
-                        color: '#fff',
-                        cursor: 'pointer',
-                        fontWeight: 700,
-                        fontSize: 12,
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      Ordine
-                    </button>
+                          <div
+                            style={{
+                              display: 'flex',
+                              gap: 8,
+                              flexWrap: 'wrap',
+                            }}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => startRenameTable(table)}
+                              style={{
+                                padding: '10px 12px',
+                                borderRadius: 10,
+                                border: '1px solid #ccc',
+                                background: '#fff',
+                                color: '#111',
+                                cursor: 'pointer',
+                                fontWeight: 700,
+                                fontSize: 12,
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              Rinomina
+                            </button>
 
-                    {statusMenuTableId === table.id && (
+                            <button
+                              type="button"
+                              onClick={() => router.push(`/staff/table/${table.id}`)}
+                              style={{
+                                padding: '10px 12px',
+                                borderRadius: 10,
+                                border: '1px solid #111',
+                                background: '#111',
+                                color: '#fff',
+                                cursor: 'pointer',
+                                fontWeight: 700,
+                                fontSize: 12,
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              Ordine
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteTable(table)}
+                              disabled={isBusy}
+                              style={{
+                                padding: '10px 12px',
+                                borderRadius: 10,
+                                border: '1px solid #b91c1c',
+                                background: '#fff5f5',
+                                color: '#991b1b',
+                                cursor: isBusy ? 'not-allowed' : 'pointer',
+                                fontWeight: 700,
+                                fontSize: 12,
+                                whiteSpace: 'nowrap',
+                                opacity: isBusy ? 0.7 : 1,
+                              }}
+                            >
+                              Elimina
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <div
+                          style={{
+                            gridColumn: '1 / -1',
+                            display: 'grid',
+                            gap: 8,
+                            padding: 10,
+                            borderRadius: 10,
+                            border: '1px solid #ddd',
+                            background: '#fff',
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color: '#444',
+                            }}
+                          >
+                            Modifica nome tavolo
+                          </div>
+
+                          <input
+                            type="text"
+                            value={editingTableName}
+                            onChange={(e) => setEditingTableName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                void handleRenameTable(table.id);
+                              }
+                              if (e.key === 'Escape') {
+                                cancelRenameTable();
+                              }
+                            }}
+                            autoFocus
+                            placeholder="Nome tavolo"
+                            style={{
+                              width: '100%',
+                              minWidth: 0,
+                              padding: '10px 12px',
+                              borderRadius: 8,
+                              border: '1px solid #ccc',
+                              fontSize: 14,
+                              background: '#fff',
+                              color: '#111',
+                            }}
+                          />
+
+                          <div
+                            style={{
+                              display: 'flex',
+                              gap: 8,
+                              flexWrap: 'wrap',
+                            }}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleRenameTable(table.id)}
+                              disabled={isBusy}
+                              style={{
+                                padding: '10px 12px',
+                                borderRadius: 8,
+                                border: 'none',
+                                background: '#111',
+                                color: '#fff',
+                                cursor: isBusy ? 'not-allowed' : 'pointer',
+                                fontWeight: 700,
+                                opacity: isBusy ? 0.7 : 1,
+                              }}
+                            >
+                              {isBusy ? 'Salvataggio...' : 'Salva nome'}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={cancelRenameTable}
+                              disabled={isBusy}
+                              style={{
+                                padding: '10px 12px',
+                                borderRadius: 8,
+                                border: '1px solid #ccc',
+                                background: '#fff',
+                                color: '#111',
+                                cursor: isBusy ? 'not-allowed' : 'pointer',
+                                fontWeight: 700,
+                                opacity: isBusy ? 0.7 : 1,
+                              }}
+                            >
+                              Annulla
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {statusMenuTableId === table.id && !isEditing && (
                       <div
                         onClick={(e) => e.stopPropagation()}
                         style={{
-                          gridColumn: '1 / -1',
                           display: 'grid',
                           gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
                           gap: 8,
